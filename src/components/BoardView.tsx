@@ -47,7 +47,18 @@ const CELL_BG: Record<CellType, string> = {
   M: 'cell-mountain',
   F: 'cell-forest',
   W: 'cell-normal',
+  K: 'cell-printed-church',
 };
+
+function PrintedChurchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="svg-icon">
+      <path d="M5 21 V12 L12 7 L19 12 V21 Z" fill="#e9dfc3" stroke="#5c4f39" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M12 2 V7 M10 4.2 H14" stroke="#5c4f39" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="12" cy="14.5" r="2.6" fill="none" stroke="#5c4f39" strokeWidth="1.3" />
+    </svg>
+  );
+}
 
 function cellIcon(t: CellType) {
   switch (t) {
@@ -66,6 +77,8 @@ function cellIcon(t: CellType) {
       return <MountainIcon />;
     case 'W':
       return <WellIcon />;
+    case 'K':
+      return <PrintedChurchIcon />;
     default:
       return null;
   }
@@ -196,6 +209,8 @@ export default function BoardView({ board, placements, preview, onDrawCell, smal
         <div key={k} className={classes.join(' ')}>
           {placement?.type === 'oeffentlich' ? (
             <span className="x-mark">✕</span>
+          ) : placement?.type === 'kirche' ? (
+            <span className="circle-mark">◯</span>
           ) : placement ? null : (
             cellIcon(t)
           )}

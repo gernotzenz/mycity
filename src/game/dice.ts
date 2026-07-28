@@ -41,6 +41,15 @@ export const DIE_B_FACES: DieFace[] = [
   { id: 'b-zirkel', cells: [], special: 'zirkel' },
 ];
 
+// Kirchenformen von Kapitel 2 in der Reihenfolge der Zeile "Kirche bauen"
+// (laut Anleitung S. 7): Zweier, Kreuz, Zweier-L, T-Form.
+export const CHURCH_SHAPES: Cell[][] = [
+  [[0, 0], [0, 1]],
+  [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
+  [[0, 0], [0, 1], [1, 0]],
+  [[0, 0], [0, 1], [0, 2], [1, 1]],
+];
+
 const BUILDING_TYPES: BuildingType[] = ['wohn', 'gewerbe', 'oeffentlich'];
 
 export function rollDice(): DiceResult {
@@ -60,19 +69,22 @@ export function combinedCells(a: number, b: number): Cell[] {
   return normalize(cells);
 }
 
+// Offizielle Bezeichnungen laut Anleitung (L-Formen nach Armlänge benannt):
+// Einer, Zweier, Dreier-Reihe, Vierer-Reihe, Quadrat,
+// Zweier-L (3 Felder), Dreier-L (4 Felder), Vierer-L (5 Felder), U-Gebäude.
 export function shapeName(cells: Cell[]): string {
   const n = cells.length;
   const h = Math.max(...cells.map((c) => c[0])) + 1;
   const w = Math.max(...cells.map((c) => c[1])) + 1;
   if (n === 1) return 'Einer';
   if (n === 2) return 'Zweier';
-  if (n === 3) return h === 1 || w === 1 ? 'Dreier-Reihe' : 'Dreier-L';
+  if (n === 3) return h === 1 || w === 1 ? 'Dreier-Reihe' : 'Zweier-L';
   if (n === 4) {
     if (h === 1 || w === 1) return 'Vierer-Reihe';
     if (h === 2 && w === 2) return 'Quadrat';
-    return 'Vierer-L';
+    return 'Dreier-L';
   }
-  if (n === 5) return h * w === 6 ? 'U-Gebäude' : 'Fünfer-L';
+  if (n === 5) return h * w === 6 ? 'U-Gebäude' : 'Vierer-L';
   return 'Großes Gebäude';
 }
 

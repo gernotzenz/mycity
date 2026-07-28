@@ -231,6 +231,20 @@ button.big {
   pointer-events: none;
 }
 
+/* Kirchen (Kapitel 2): Kreise */
+.built-kirche { background: #fdf7e7; }
+
+.circle-mark {
+  color: #7a2e1d;
+  font-weight: 900;
+  font-size: clamp(10px, 3vw, 18px);
+  pointer-events: none;
+}
+
+.cell-printed-church {
+  background: linear-gradient(140deg, #efe4c2, #e2d3a4);
+}
+
 .built.b-top { border-top: 2.5px solid #16213e; }
 .built.b-bottom { border-bottom: 2.5px solid #16213e; }
 .built.b-left { border-left: 2.5px solid #16213e; }
@@ -477,6 +491,8 @@ button.big {
 
 .score-table td:first-child { text-align: left; }
 .total-row { background: #f0e3bd; }
+.chapter-row { background: #f6edd2; font-style: italic; }
+.mini-cell .circle-mark { font-size: 13px; }
 
 .boards-final {
   display: flex;

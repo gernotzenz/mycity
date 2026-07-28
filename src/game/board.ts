@@ -12,7 +12,8 @@
 // Das Raster lässt sich hier einfach anpassen, falls einzelne Felder vom
 // Original abweichen.
 
-export type CellType = '.' | '~' | 'T' | 'D' | 'S' | 'M' | 'F' | 'W';
+//   K  = gedruckte Kirche (nur Spiel 6; nicht bebaubar, gilt als erstes Gebäude)
+export type CellType = '.' | '~' | 'T' | 'D' | 'S' | 'M' | 'F' | 'W' | 'K';
 
 export interface BoardDef {
   w: number;
@@ -47,8 +48,44 @@ const SPIEL_3_LAYOUT = SPIEL_1_LAYOUT.map((row, r) =>
 );
 export const BOARD_SPIEL_3 = parse(SPIEL_3_LAYOUT);
 
-export function boardForGame(gameNo: 1 | 2 | 3): BoardDef {
-  return gameNo === 3 ? BOARD_SPIEL_3 : gameNo === 2 ? BOARD_SPIEL_2 : BOARD_SPIEL_1;
+// Kapitel 2 (Spiele 4-6) – rekonstruiert nach Foto des Spiel-4-Blatts.
+const SPIEL_4_LAYOUT = [
+  '..D.~....SF',
+  'S...~...DFF',
+  'M..~~.D...F',
+  'MM~~...S...',
+  'MS~...D..SF',
+  '.~~..D...FF',
+  'S~.....SFFF',
+  '~~S.....FFF',
+];
+export const BOARD_SPIEL_4 = parse(SPIEL_4_LAYOUT);
+
+// Spiel 5: wie Spiel 4, aber mit 2 Brunnen.
+const SPIEL_5_LAYOUT = SPIEL_4_LAYOUT.map((row, r) => {
+  if (r === 2) return row.slice(0, 8) + 'W' + row.slice(9);
+  if (r === 5) return row.slice(0, 7) + 'W' + row.slice(8);
+  return row;
+});
+export const BOARD_SPIEL_5 = parse(SPIEL_5_LAYOUT);
+
+// Spiel 6: wie Spiel 5, zusätzlich gedruckte Kirche am Fluss.
+const SPIEL_6_LAYOUT = SPIEL_5_LAYOUT.map((row, r) =>
+  r === 4 ? row.slice(0, 3) + 'K' + row.slice(4) : row
+);
+export const BOARD_SPIEL_6 = parse(SPIEL_6_LAYOUT);
+
+const BOARDS: Record<number, BoardDef> = {
+  1: BOARD_SPIEL_1,
+  2: BOARD_SPIEL_2,
+  3: BOARD_SPIEL_3,
+  4: BOARD_SPIEL_4,
+  5: BOARD_SPIEL_5,
+  6: BOARD_SPIEL_6,
+};
+
+export function boardForGame(gameNo: number): BoardDef {
+  return BOARDS[gameNo] ?? BOARD_SPIEL_1;
 }
 
 export function isBuildable(t: CellType): boolean {

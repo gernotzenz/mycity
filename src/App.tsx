@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { boardForGame } from './game/board';
-import { rollDice, combinedCells, shapesEqual } from './game/dice';
+import { rollDice, combinedCells, shapesEqual, CHURCH_SHAPES, DIE_B_FACES } from './game/dice';
 import { scoreGame, validatePlacement } from './game/rules';
-import type { Cell, GameRow, PlayerState, SharedState } from './game/types';
-import { BUILDING_LABEL, MAX_PASSES } from './game/types';
+import type { Cell, GameRow, HistoryEntry, PlayerState, SharedState } from './game/types';
+import { BUILDING_LABEL, MAX_PASSES, chapterOf } from './game/types';
 import BoardView from './components/BoardView';
 import DicePanel from './components/DicePanel';
 
@@ -148,14 +148,21 @@ export default function App() {
 
   // ---- Aktionen ----
 
-  async function createGame(gameNo: 1 | 2 | 3) {
+  async function createGame(gameNo: number) {
     if (!supabase) return;
     setError('');
     const code = randomCode();
-    const shared: SharedState = { status: 'lobby', gameNo, round: 0, rollerSeat: 1, dice: null };
+    const shared: SharedState = {
+      status: 'lobby',
+      gameNo,
+      round: 0,
+      rollerSeat: 1,
+      dice: null,
+      churchesUsed: 0,
+    };
     const { data, error: err } = await supabase
       .from('games')
-      .insert({ code, shared, p1: newPlayer(name || 'Spieler 1'), p2: null })
+      .insert({ code, shared, p1: newPlayer(name || 'Spieler 1'), p2: null, history: [] })
       .select()
       .single();
     if (err || !data) {
@@ -204,7 +211,21 @@ export default function App() {
 
   function doRoll() {
     if (!row) return;
-    persist({ shared: { ...row.shared, dice: rollDice() } });
+    const dice = rollDice();
+    const { gameNo, churchesUsed } = row.shared;
+    // Kapitel 2: Zirkel gewürfelt -> Kirche bauen (solange Kreise frei sind)
+    const isZirkel = DIE_B_FACES[dice.b].special === 'zirkel';
+    if (gameNo >= 4 && gameNo <= 6 && isZirkel && churchesUsed < CHURCH_SHAPES.length) {
+      persist({
+        shared: {
+          ...row.shared,
+          dice: { ...dice, church: churchesUsed },
+          churchesUsed: churchesUsed + 1,
+        },
+      });
+    } else {
+      persist({ shared: { ...row.shared, dice: { ...dice, church: null } } });
+    }
   }
 
   async function updateMe(patch: Partial<PlayerState>) {
@@ -214,12 +235,27 @@ export default function App() {
     await persist(seat === 1 ? { p1: updated } : { p2: updated });
   }
 
-  function restart(gameNo: 1 | 2 | 3) {
+  function restart(gameNo: number) {
     if (!row) return;
+    // Ergebnis des beendeten Spiels in die Historie übernehmen (Zwischenstand)
+    const board = boardForGame(row.shared.gameNo);
+    const entry: HistoryEntry = {
+      gameNo: row.shared.gameNo,
+      p1: row.p1 ? scoreGame(board, row.p1, row.shared.gameNo).total : 0,
+      p2: row.p2 ? scoreGame(board, row.p2, row.shared.gameNo).total : 0,
+    };
     persist({
-      shared: { status: 'playing', gameNo, round: 1, rollerSeat: 1, dice: null },
+      shared: {
+        status: 'playing',
+        gameNo,
+        round: 1,
+        rollerSeat: 1,
+        dice: null,
+        churchesUsed: 0,
+      },
       p1: row.p1 ? newPlayer(row.p1.name) : null,
       p2: row.p2 ? newPlayer(row.p2.name) : null,
+      history: [...(row.history ?? []), entry],
     });
   }
 
@@ -252,12 +288,18 @@ export default function App() {
         </div>
         <div className="card">
           <h2>Neues Spiel</h2>
+          <p className="hint">Kapitel 1: Das neue Land</p>
           <div className="row-buttons">
             <button className="primary" onClick={() => createGame(1)}>Spiel 1</button>
             <button onClick={() => createGame(2)}>Spiel 2</button>
             <button onClick={() => createGame(3)}>Spiel 3</button>
           </div>
-          <p className="hint">Kapitel 1: Das neue Land</p>
+          <p className="hint">Kapitel 2: Die Kirchen</p>
+          <div className="row-buttons">
+            <button onClick={() => createGame(4)}>Spiel 4</button>
+            <button onClick={() => createGame(5)}>Spiel 5</button>
+            <button onClick={() => createGame(6)}>Spiel 6</button>
+          </div>
         </div>
         <div className="card">
           <h2>Spiel beitreten</h2>
@@ -314,42 +356,57 @@ export default function App() {
 
 // ---------------- Regel-Info ----------------
 
-function RulesModal({ gameNo, onClose }: { gameNo: 1 | 2 | 3; onClose: () => void }) {
+const GAME_STORY: Record<number, string> = {
+  1: 'Als erste Siedler habt ihr das neue Land erreicht und errichtet eure Gebäude entlang des Flusses.',
+  2: 'Eure Gemeinde einigt sich auf ein geplantes Vorgehen – nun entstehen geordnete Stadtviertel.',
+  3: 'Um die Wasserversorgung zu verbessern, wird im Osten ein Brunnen gebohrt, von dem möglichst viele Gebäude profitieren sollen.',
+  4: 'Mit immer mehr Siedlern kommt auch die Kirche in eure Gemeinde. Die Kirchenbauer haben genaue Vorstellungen, welche Bauten entstehen sollen.',
+  5: 'Die Kirchen gewinnen an Einfluss – alle Siedlergruppen suchen die Nähe zu den Kirchen, um gehört zu werden.',
+  6: 'Die Kirchen fordern immer mehr Land. Auch andere Gruppen beanspruchen einen Teil des knappen Baulands.',
+};
+
+function RulesModal({ gameNo, onClose }: { gameNo: number; onClose: () => void }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Kapitel 1 · Spiel {gameNo}</h2>
-        {gameNo === 1 && (
-          <p className="story">
-            <i>
-              Als erste Siedler habt ihr das neue Land erreicht und errichtet eure Gebäude
-              entlang des Flusses.
-            </i>
-          </p>
-        )}
-        {gameNo === 2 && (
-          <p className="story">
-            <i>
-              Eure Gemeinde einigt sich auf ein geplantes Vorgehen – nun entstehen geordnete
-              Stadtviertel.
-            </i>
-          </p>
-        )}
-        {gameNo === 3 && (
-          <p className="story">
-            <i>
-              Um die Wasserversorgung zu verbessern, wird im Osten ein Brunnen gebohrt, von dem
-              möglichst viele Gebäude profitieren sollen.
-            </i>
-          </p>
-        )}
+        <h2>
+          Kapitel {chapterOf(gameNo)} · Spiel {gameNo}
+        </h2>
+        <p className="story">
+          <i>{GAME_STORY[gameNo]}</i>
+        </p>
         <h3>Bauregeln</h3>
         <ul>
-          <li>Das erste Gebäude muss mit einer Seite an den Fluss angrenzen.</li>
+          {gameNo === 6 ? (
+            <li>
+              <b>An der Kirche beginnen:</b> Das erste Gebäude muss an die gedruckte Kirche
+              angrenzen.
+            </li>
+          ) : (
+            <li>Das erste Gebäude muss mit einer Seite an den Fluss angrenzen.</li>
+          )}
           <li>Jedes weitere Gebäude muss an ein vorhandenes angrenzen (auch über den Fluss hinweg).</li>
           <li>Nicht über den Fluss bauen; Gebirge und Wald sind gesperrt.</li>
           <li>Bäume und Steine dürfen überbaut werden.</li>
-          <li>Passen kostet: −1 / −2 / −3 / −5 / −7 / −10 (max. 6-mal).</li>
+          {gameNo === 6 ? (
+            <li>
+              <b>Passen ist nicht möglich!</b> Kannst oder willst du nicht bauen, musst du dein
+              Spiel beenden.
+            </li>
+          ) : (
+            <li>Passen kostet: −1 / −2 / −3 / −5 / −7 / −10 (max. 6-mal).</li>
+          )}
+          {gameNo >= 4 && gameNo <= 6 && (
+            <>
+              <li>
+                <b>Kirchen:</b> Wird der Zirkel gewürfelt, bauen alle die nächste Kirche aus der
+                Reihe (statt des normalen Gebäudes). Kirchen sind mit ◯ markiert.
+              </li>
+              {gameNo !== 6 && (
+                <li>Wer beim Kirchenbau passt, malt ZWEI Kreise in „Gebäude nicht bauen“ aus.</li>
+              )}
+            </>
+          )}
           <li>Nach jedem Wurf darfst du dein Spiel freiwillig beenden.</li>
         </ul>
         <h3>Wertung</h3>
@@ -360,11 +417,19 @@ function RulesModal({ gameNo, onClose }: { gameNo: 1 | 2 | 3; onClose: () => voi
           {gameNo >= 2 && (
             <li>
               Je Gebäudeart: +1 Punkt pro Gebäude in der größten zusammenhängenden Gruppe dieser
-              Art.
+              Art (Kirchen zählen zu keiner Art).
             </li>
           )}
-          {gameNo >= 3 && (
-            <li>Brunnen: +4, wenn 4 Gebäude seitlich angrenzen (überbaut bringt er nichts).</li>
+          {(gameNo === 3 || gameNo === 5 || gameNo === 6) && (
+            <li>
+              Brunnen: +4 je Brunnen, wenn 4 Gebäude seitlich angrenzen (überbaut bringt er
+              nichts).
+            </li>
+          )}
+          {gameNo >= 5 && (
+            <li>
+              Kirchenpunkte: +3 je Kirche, an die Gebäude aller 3 Gebäudearten angrenzen.
+            </li>
           )}
         </ul>
         <button className="primary big" onClick={onClose}>
@@ -406,10 +471,12 @@ function GameScreen({
     setMarked([]);
   }, [shared.round, shared.dice?.a, shared.dice?.b]);
 
-  const targetCells = useMemo(
-    () => (shared.dice ? combinedCells(shared.dice.a, shared.dice.b) : []),
-    [shared.dice]
-  );
+  const isChurchRound = shared.dice?.church != null;
+  const targetCells = useMemo(() => {
+    if (!shared.dice) return [];
+    if (shared.dice.church != null) return CHURCH_SHAPES[shared.dice.church];
+    return combinedCells(shared.dice.a, shared.dice.b);
+  }, [shared.dice]);
 
   const occupied = useMemo(() => {
     const s = new Set<string>();
@@ -429,7 +496,7 @@ function GameScreen({
       }
       if (idx >= 0) return prev; // schon markiert
       if (occupied.has(k)) return prev;
-      if (t === '~' || t === 'M' || t === 'F') return prev; // Fluss/Gebirge/Wald
+      if (t === '~' || t === 'M' || t === 'F' || t === 'K') return prev; // gesperrte Felder
       if (prev.length >= targetCells.length) return prev; // schon genug Felder
       return [...prev, [r, c] as Cell];
     });
@@ -438,8 +505,9 @@ function GameScreen({
   const complete = marked.length === targetCells.length && targetCells.length > 0;
   const shapeOk = complete && shapesEqual(marked, targetCells);
   const validation = useMemo(
-    () => (complete ? validatePlacement(board, me.placements, marked) : null),
-    [complete, board, me.placements, marked]
+    () =>
+      complete ? validatePlacement(board, me.placements, marked, shared.gameNo === 6) : null,
+    [complete, board, me.placements, marked, shared.gameNo]
   );
   const canConfirm = complete && shapeOk && (validation?.ok ?? false);
 
@@ -459,17 +527,28 @@ function GameScreen({
     await updateMe({
       placements: [
         ...me.placements,
-        { cells: marked, type: shared.dice.type, round: shared.round },
+        {
+          cells: marked,
+          type: isChurchRound ? 'kirche' : shared.dice.type,
+          round: shared.round,
+        },
       ],
       doneRound: shared.round,
     });
     setMarked([]);
   }
 
+  // Beim Bau einer Kirche kostet Passen ZWEI Kreise; in Spiel 6 ist Passen verboten.
+  const passCost = isChurchRound ? 2 : 1;
+  const canPass = shared.gameNo !== 6 && me.passes + passCost <= MAX_PASSES;
+
   async function doPass() {
-    if (me.passes >= MAX_PASSES) return;
-    if (!confirm('Wirklich passen? (Kreis ' + (me.passes + 1) + ' von 6 wird ausgemalt)')) return;
-    await updateMe({ passes: me.passes + 1, doneRound: shared.round });
+    if (!canPass) return;
+    const msg = isChurchRound
+      ? 'Kirche nicht bauen? Das kostet ZWEI Kreise in „Gebäude nicht bauen“.'
+      : 'Wirklich passen? (Kreis ' + (me.passes + 1) + ' von 6 wird ausgemalt)';
+    if (!confirm(msg)) return;
+    await updateMe({ passes: me.passes + passCost, doneRound: shared.round });
   }
 
   async function doFinish() {
@@ -486,7 +565,9 @@ function GameScreen({
         <button className="icon-btn" onClick={() => setShowRules(true)} aria-label="Regeln">
           ⓘ
         </button>
-        <span>Spiel {shared.gameNo}</span>
+        <span>
+          Kap. {chapterOf(shared.gameNo)} · Spiel {shared.gameNo}
+        </span>
         <span>Runde {shared.round}</span>
         <span>Passen: {me.passes}/6</span>
         <button className="icon-btn" onClick={onLeave} aria-label="Verlassen">
@@ -535,9 +616,11 @@ function GameScreen({
             <button onClick={() => setMarked([])} disabled={marked.length === 0}>
               ↺ Zurücksetzen
             </button>
-            <button onClick={doPass} disabled={me.passes >= MAX_PASSES}>
-              Passen ({me.passes}/6)
-            </button>
+            {shared.gameNo !== 6 && (
+              <button onClick={doPass} disabled={!canPass}>
+                Passen ({me.passes}/6{isChurchRound ? ' · ×2' : ''})
+              </button>
+            )}
             <button className="danger" onClick={doFinish}>
               Spiel beenden
             </button>
@@ -559,6 +642,96 @@ function GameScreen({
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------- Zwischenstand (Kapitel-Gesamtrechnung) ----------------
+
+function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: number[] }) {
+  const entries: HistoryEntry[] = [
+    ...(row.history ?? []),
+    { gameNo: row.shared.gameNo, p1: currentTotals[0] ?? 0, p2: currentTotals[1] ?? 0 },
+  ];
+  const names = [row.p1?.name ?? 'Spieler 1', row.p2?.name ?? 'Spieler 2'];
+  const chapters = [...new Set(entries.map((e) => chapterOf(e.gameNo)))].sort();
+
+  const sum = (list: HistoryEntry[]) => [
+    list.reduce((a, e) => a + e.p1, 0),
+    list.reduce((a, e) => a + e.p2, 0),
+  ];
+  const [totalP1, totalP2] = sum(entries);
+
+  return (
+    <div className="card">
+      <h2>Zwischenstand</h2>
+      <table className="score-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>{names[0]}</th>
+            <th>{names[1]}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {chapters.map((ch) => {
+            const inChapter = entries.filter((e) => chapterOf(e.gameNo) === ch);
+            const [c1, c2] = sum(inChapter);
+            return (
+              <FragmentRows
+                key={ch}
+                chapter={ch}
+                entries={inChapter}
+                chapterSum={[c1, c2]}
+              />
+            );
+          })}
+          <tr className="total-row">
+            <td>Gesamt</td>
+            <td>
+              <b>{totalP1}</b>
+            </td>
+            <td>
+              <b>{totalP2}</b>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="hint">
+        Der Zwischenstand wird fortgeschrieben, wenn ihr über „Weiterspielen“ das nächste Spiel
+        startet.
+      </p>
+    </div>
+  );
+}
+
+function FragmentRows({
+  chapter,
+  entries,
+  chapterSum,
+}: {
+  chapter: number;
+  entries: HistoryEntry[];
+  chapterSum: number[];
+}) {
+  return (
+    <>
+      {entries.map((e, i) => (
+        <tr key={chapter + '-' + i}>
+          <td>Spiel {e.gameNo}</td>
+          <td>{e.p1}</td>
+          <td>{e.p2}</td>
+        </tr>
+      ))}
+      <tr className="chapter-row">
+        <td>Kapitel {chapter} gesamt</td>
+        <td>
+          <b>{chapterSum[0]}</b>
+        </td>
+        <td>
+          <b>{chapterSum[1]}</b>
+        </td>
+      </tr>
+    </>
   );
 }
 
@@ -636,11 +809,19 @@ function ScoringScreen({
               ))}
             </>
           )}
-          {row.shared.gameNo >= 3 && (
+          {scores[0]?.wellPoints != null && (
             <tr>
               <td>Brunnen</td>
               {scores.map((s, i) => (
                 <td key={i}>+{s.wellPoints ?? 0}</td>
+              ))}
+            </tr>
+          )}
+          {scores[0]?.churchPoints != null && (
+            <tr>
+              <td>Kirchen +3</td>
+              {scores.map((s, i) => (
+                <td key={i}>+{s.churchPoints ?? 0}</td>
               ))}
             </tr>
           )}
@@ -656,6 +837,9 @@ function ScoringScreen({
       </table>
       <h2 className="center">{winner}</h2>
 
+      <Zwischenstand row={row} currentTotals={scores.map((s) => s.total)} />
+
+
       <div className="boards-final">
         {players.map((p) => (
           <div key={p.name}>
@@ -667,11 +851,16 @@ function ScoringScreen({
 
       {seat === 1 && (
         <div className="card">
-          <h2>Nochmal spielen</h2>
+          <h2>Weiterspielen</h2>
           <div className="row-buttons">
             <button className="primary" onClick={() => onRestart(1)}>Spiel 1</button>
             <button className="primary" onClick={() => onRestart(2)}>Spiel 2</button>
             <button className="primary" onClick={() => onRestart(3)}>Spiel 3</button>
+          </div>
+          <div className="row-buttons">
+            <button className="primary" onClick={() => onRestart(4)}>Spiel 4</button>
+            <button className="primary" onClick={() => onRestart(5)}>Spiel 5</button>
+            <button className="primary" onClick={() => onRestart(6)}>Spiel 6</button>
           </div>
         </div>
       )}

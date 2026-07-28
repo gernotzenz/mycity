@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DIE_A_FACES, DIE_B_FACES, combinedCells, shapeName } from '../game/dice';
+import { CHURCH_SHAPES, DIE_A_FACES, DIE_B_FACES, combinedCells, shapeName } from '../game/dice';
 import type { BuildingType, Cell, DiceResult } from '../game/types';
 
 const TYPE_NAME: Record<string, string> = {
@@ -102,6 +102,40 @@ export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey
   const cells = combinedCells(dice.a, dice.b);
   const hasZirkel = faceB.special === 'zirkel';
 
+  // Kirchenrunde (Kapitel 2): Zirkel gewürfelt -> alle bauen dieselbe Kirche
+  if (dice.church != null) {
+    const church = CHURCH_SHAPES[dice.church];
+    const maxR = Math.max(...church.map((c) => c[0])) + 1;
+    const maxC = Math.max(...church.map((c) => c[1])) + 1;
+    const set = new Set(church.map(([r, c]) => r + ',' + c));
+    const out = [];
+    for (let r = 0; r < maxR; r++) {
+      for (let c = 0; c < maxC; c++) {
+        const filled = set.has(r + ',' + c);
+        out.push(
+          <div key={r + ',' + c} className={'mini-cell' + (filled ? ' filled built-kirche' : ' empty-mini')}>
+            {filled ? <span className="circle-mark">◯</span> : null}
+          </div>
+        );
+      }
+    }
+    return (
+      <div className="dice-panel result-pop">
+        <div className="dice-row">
+          <BlueDieFace face={faceB} side="B" />
+          <span className="dice-plus">→</span>
+          <div className="mini-grid" style={{ gridTemplateColumns: `repeat(${maxC}, 20px)` }}>
+            {out}
+          </div>
+        </div>
+        <div className="dice-label">
+          <b>Kirche bauen!</b> ({dice.church + 1}/{CHURCH_SHAPES.length})
+        </div>
+        <div className="dice-note">Zirkel gewürfelt: alle zeichnen diese Kirche ein (◯)</div>
+      </div>
+    );
+  }
+
   return (
     <div className="dice-panel result-pop">
       <div className="dice-row">
@@ -118,7 +152,7 @@ export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey
         <b>{shapeName(cells)}</b> · {TYPE_NAME[dice.type]}
       </div>
       {hasZirkel && (
-        <div className="dice-note">Zirkel: hat in Kapitel 1 keine Bedeutung (zählt als leere Seite)</div>
+        <div className="dice-note">Zirkel: zählt gerade als leere Seite – nur der linke Würfel zählt</div>
       )}
       {faceB.special === 'blank' && (
         <div className="dice-note">Leere Seite: es zählt nur der linke Würfel</div>
