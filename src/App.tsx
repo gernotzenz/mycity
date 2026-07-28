@@ -745,7 +745,7 @@ function ScoringScreen({
 }: {
   row: GameRow;
   seat: 1 | 2;
-  onRestart: (gameNo: 1 | 2 | 3) => void;
+  onRestart: (gameNo: number) => void;
   onLeave: () => void;
 }) {
   const board = boardForGame(row.shared.gameNo);
