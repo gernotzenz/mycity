@@ -219,6 +219,11 @@ button.big {
 .built.b-left { border-left: 2.5px solid #16213e; }
 .built.b-right { border-right: 2.5px solid #16213e; }
 
+.preview-partial {
+  outline: 3px solid #274b8f;
+  outline-offset: -3px;
+  background: rgba(39, 75, 143, 0.4) !important;
+}
 .preview-ok {
   outline: 3px solid #27ae60;
   outline-offset: -3px;
@@ -229,6 +234,15 @@ button.big {
   outline-offset: -3px;
   background: rgba(192, 57, 43, 0.5) !important;
 }
+
+.draw-message {
+  margin: 2px 0 6px;
+  font-size: 0.9rem;
+  color: #5c4f39;
+  font-weight: 600;
+}
+.draw-message.ok { color: #1d8a4a; }
+.draw-message.bad { color: #c0392b; }
 
 .board-small { max-width: 320px; }
 .board-small .svg-icon { width: 70%; }
@@ -290,18 +304,21 @@ button.big {
   100% { transform: scale(1); opacity: 1; }
 }
 
-.dice-row { display: flex; align-items: center; gap: 10px; }
-.dice-eq, .dice-plus { font-size: 1.3rem; font-weight: 700; color: #6e5f45; }
+.dice-row { display: flex; align-items: center; gap: 12px; }
+.dice-plus { font-size: 1.3rem; font-weight: 700; color: #6e5f45; }
+
+/* Die beiden blauen Würfel stecken direkt zusammen (Halbkreise = Vollkreis) */
+.dice-pair { display: flex; gap: 2px; align-items: center; }
 
 .blue-die {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, 16px);
-  grid-template-rows: repeat(2, 16px);
+  grid-template-columns: repeat(2, 20px);
+  grid-template-rows: repeat(2, 20px);
   gap: 2px;
   background: #274b8f;
-  padding: 5px;
-  border-radius: 8px;
+  padding: 6px;
+  border-radius: 9px;
   box-shadow: 0 3px 6px rgba(15, 45, 80, 0.3);
 }
 

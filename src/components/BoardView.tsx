@@ -3,10 +3,12 @@ import type { BoardDef, CellType } from '../game/board';
 import type { Cell, Placement } from '../game/types';
 import { coveredMap } from '../game/rules';
 
+export type PreviewState = 'partial' | 'ok' | 'bad';
+
 interface Props {
   board: BoardDef;
   placements: Placement[];
-  preview?: { cells: Cell[]; valid: boolean } | null;
+  preview?: { cells: Cell[]; state: PreviewState } | null;
   onTapCell?: (r: number, c: number) => void;
   small?: boolean;
 }
@@ -139,9 +141,9 @@ function RiverOverlay({ board }: { board: BoardDef }) {
       viewBox={`0 0 ${board.w * 100} ${board.h * 100}`}
       preserveAspectRatio="none"
     >
-      <path d={d} fill="none" stroke="#3e88ad" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke="#79c6e3" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke="#b6e4f2" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+      <path d={d} fill="none" stroke="#3e88ad" strokeWidth="92" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="#79c6e3" strokeWidth="76" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="#b6e4f2" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" />
     </svg>
   );
 }
@@ -168,7 +170,7 @@ export default function BoardView({ board, placements, preview, onTapCell, small
         if (!sameB(r, c - 1)) classes.push('b-left');
         if (!sameB(r, c + 1)) classes.push('b-right');
       }
-      if (previewSet.has(k)) classes.push(preview!.valid ? 'preview-ok' : 'preview-bad');
+      if (previewSet.has(k)) classes.push('preview-' + preview!.state);
 
       cells.push(
         <div

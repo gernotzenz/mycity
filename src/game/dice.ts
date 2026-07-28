@@ -86,6 +86,19 @@ export function normalize(cells: Cell[]): Cell[] {
     .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
 
+// Prüft, ob zwei Zellmengen dieselbe Form sind (Drehen & Spiegeln erlaubt).
+export function shapesEqual(a: Cell[], b: Cell[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (cs: Cell[]) => normalize(cs).map(([r, c]) => r + ',' + c).join(';');
+  const ka = key(a);
+  for (const m of [false, true]) {
+    for (let r = 0; r < 4; r++) {
+      if (key(transformCells(b, r, m)) === ka) return true;
+    }
+  }
+  return false;
+}
+
 export function transformCells(base: Cell[], rot: number, mirrored: boolean): Cell[] {
   let cells = base;
   if (mirrored) cells = cells.map(([r, c]) => [r, -c] as Cell);

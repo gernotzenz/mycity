@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { boardForGame } from './game/board';
-import { rollDice, combinedCells, transformCells } from './game/dice';
+import { rollDice, combinedCells, shapesEqual } from './game/dice';
 import { scoreGame, validatePlacement } from './game/rules';
 import type { Cell, GameRow, PlayerState, SharedState } from './game/types';
 import { BUILDING_LABEL, MAX_PASSES } from './game/types';
@@ -298,39 +298,67 @@ function GameScreen({
   const myTurnToRoll = shared.rollerSeat === seat && !shared.dice && !me.finished;
   const canAct = !!shared.dice && !me.finished && me.doneRound < shared.round;
 
-  const [anchor, setAnchor] = useState<Cell | null>(null);
-  const [rot, setRot] = useState(0);
-  const [mirrored, setMirrored] = useState(false);
+  // Der Spieler zeichnet die Form selbst ein: Felder einzeln antippen.
+  const [marked, setMarked] = useState<Cell[]>([]);
 
   // Bei neuem Wurf Auswahl zurücksetzen
   useEffect(() => {
-    setAnchor(null);
-    setRot(0);
-    setMirrored(false);
+    setMarked([]);
   }, [shared.round, shared.dice?.a, shared.dice?.b]);
 
-  const previewCells: Cell[] | null = useMemo(() => {
-    if (!shared.dice || !anchor) return null;
-    const base = combinedCells(shared.dice.a, shared.dice.b);
-    const rel = transformCells(base, rot, mirrored);
-    return rel.map(([r, c]) => [r + anchor[0], c + anchor[1]] as Cell);
-  }, [shared.dice, anchor, rot, mirrored]);
+  const targetCells = useMemo(
+    () => (shared.dice ? combinedCells(shared.dice.a, shared.dice.b) : []),
+    [shared.dice]
+  );
 
-  const validation = useMemo(() => {
-    if (!previewCells) return null;
-    return validatePlacement(board, me.placements, previewCells);
-  }, [previewCells, board, me.placements]);
+  const occupied = useMemo(() => {
+    const s = new Set<string>();
+    me.placements.forEach((p) => p.cells.forEach(([r, c]) => s.add(r + ',' + c)));
+    return s;
+  }, [me.placements]);
+
+  function toggleCell(r: number, c: number) {
+    const t = board.grid[r][c];
+    const k = r + ',' + c;
+    if (occupied.has(k)) return;
+    if (t === '~' || t === 'M' || t === 'F') return; // Fluss/Gebirge/Wald nicht antippbar
+    setMarked((prev) => {
+      const idx = prev.findIndex(([pr, pc]) => pr === r && pc === c);
+      if (idx >= 0) return prev.filter((_, i) => i !== idx);
+      if (prev.length >= targetCells.length) return prev; // schon genug Felder markiert
+      return [...prev, [r, c] as Cell];
+    });
+  }
+
+  const complete = marked.length === targetCells.length && targetCells.length > 0;
+  const shapeOk = complete && shapesEqual(marked, targetCells);
+  const validation = useMemo(
+    () => (complete ? validatePlacement(board, me.placements, marked) : null),
+    [complete, board, me.placements, marked]
+  );
+  const canConfirm = complete && shapeOk && (validation?.ok ?? false);
+
+  const drawMessage = !complete
+    ? marked.length === 0
+      ? 'Zeichne die gewürfelte Form ein: tippe ' + targetCells.length + ' Felder an.'
+      : 'Noch ' + (targetCells.length - marked.length) + ' Feld' +
+        (targetCells.length - marked.length > 1 ? 'er' : '') + ' antippen …'
+    : !shapeOk
+      ? 'Das entspricht nicht der gewürfelten Form (drehen/spiegeln ist erlaubt).'
+      : !validation?.ok
+        ? validation?.reason ?? ''
+        : 'Form korrekt – einzeichnen!';
 
   async function confirmPlace() {
-    if (!previewCells || !validation?.ok || !shared.dice) return;
+    if (!canConfirm || !shared.dice) return;
     await updateMe({
       placements: [
         ...me.placements,
-        { cells: previewCells, type: shared.dice.type, round: shared.round },
+        { cells: marked, type: shared.dice.type, round: shared.round },
       ],
       doneRound: shared.round,
     });
-    setAnchor(null);
+    setMarked([]);
   }
 
   async function doPass() {
@@ -376,30 +404,25 @@ function GameScreen({
         board={board}
         placements={me.placements}
         preview={
-          previewCells && canAct ? { cells: previewCells, valid: validation?.ok ?? false } : null
+          marked.length > 0 && canAct
+            ? { cells: marked, state: !complete ? 'partial' : canConfirm ? 'ok' : 'bad' }
+            : null
         }
-        onTapCell={canAct ? (r, c) => setAnchor([r, c]) : undefined}
+        onTapCell={canAct ? toggleCell : undefined}
       />
 
       {canAct && (
         <div className="controls">
-          {anchor ? (
-            <>
-              <div className="row-buttons">
-                <button onClick={() => setRot((r) => r + 1)}>↻ Drehen</button>
-                <button onClick={() => setMirrored((m) => !m)}>⇄ Spiegeln</button>
-              </div>
-              {!validation?.ok && validation?.reason && (
-                <p className="error small">{validation.reason}</p>
-              )}
-              <button className="primary big" disabled={!validation?.ok} onClick={confirmPlace}>
-                ✔ Einzeichnen
-              </button>
-            </>
-          ) : (
-            <p className="hint">Tippe auf ein Feld, um die Form zu platzieren.</p>
-          )}
+          <p className={'draw-message' + (canConfirm ? ' ok' : complete ? ' bad' : '')}>
+            {drawMessage}
+          </p>
+          <button className="primary big" disabled={!canConfirm} onClick={confirmPlace}>
+            ✔ Einzeichnen
+          </button>
           <div className="row-buttons">
+            <button onClick={() => setMarked([])} disabled={marked.length === 0}>
+              ↺ Zurücksetzen
+            </button>
             <button onClick={doPass} disabled={me.passes >= MAX_PASSES}>
               Passen ({me.passes}/6)
             </button>
