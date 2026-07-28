@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { boardForGame } from './game/board';
-import { rollDice, transformShape, SHAPE_BY_ID } from './game/dice';
+import { rollDice, combinedCells, transformCells } from './game/dice';
 import { scoreGame, validatePlacement } from './game/rules';
 import type { Cell, GameRow, PlayerState, SharedState } from './game/types';
 import { BUILDING_LABEL, MAX_PASSES } from './game/types';
@@ -307,11 +307,12 @@ function GameScreen({
     setAnchor(null);
     setRot(0);
     setMirrored(false);
-  }, [shared.round, shared.dice?.shapeId]);
+  }, [shared.round, shared.dice?.a, shared.dice?.b]);
 
   const previewCells: Cell[] | null = useMemo(() => {
     if (!shared.dice || !anchor) return null;
-    const rel = transformShape(shared.dice.shapeId, rot, mirrored);
+    const base = combinedCells(shared.dice.a, shared.dice.b);
+    const rel = transformCells(base, rot, mirrored);
     return rel.map(([r, c]) => [r + anchor[0], c + anchor[1]] as Cell);
   }, [shared.dice, anchor, rot, mirrored]);
 
@@ -358,7 +359,7 @@ function GameScreen({
         {shared.dice ? (
           <DicePanel
             dice={shared.dice}
-            rollKey={shared.round + '-' + shared.dice.shapeId + '-' + shared.dice.type}
+            rollKey={shared.round + '-' + shared.dice.a + '-' + shared.dice.b + '-' + shared.dice.type}
           />
         ) : me.finished ? (
           <p className="hint">Du hast dein Spiel beendet – warte auf {other?.name ?? 'Mitspieler'} …</p>

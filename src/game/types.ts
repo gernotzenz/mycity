@@ -17,7 +17,8 @@ export interface PlayerState {
 }
 
 export interface DiceResult {
-  shapeId: string;
+  a: number; // Seite von Würfel A (0-5)
+  b: number; // Seite von Würfel B (0-5)
   type: BuildingType;
 }
 

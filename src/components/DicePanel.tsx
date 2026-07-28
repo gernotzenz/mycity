@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SHAPE_BY_ID, normalize } from '../game/dice';
+import { DIE_A_FACES, DIE_B_FACES, combinedCells, shapeName } from '../game/dice';
 import type { BuildingType, Cell, DiceResult } from '../game/types';
 
 const TYPE_NAME: Record<string, string> = {
@@ -38,21 +38,22 @@ function HouseIcon({ type, size = 34 }: { type: BuildingType; size?: number }) {
   );
 }
 
-// ---------- Blaue Würfelhälften ----------
+// ---------- Zirkel-Symbol ----------
 
-function splitHalves(cells: Cell[]): [Cell[], Cell[]] {
-  const sorted = [...cells].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
-  const half = Math.ceil(sorted.length / 2);
-  const left = sorted.slice(0, half);
-  const right = sorted.slice(half);
-  return [
-    left.length ? normalize(left) : [],
-    right.length ? normalize(right) : [],
-  ];
+function ZirkelIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26">
+      <circle cx="12" cy="5" r="2.2" fill="none" stroke="#fff" strokeWidth="1.6" />
+      <path d="M11 7 L6.5 20 M13 7 L17.5 20" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8.2 15.5 A7 7 0 0 0 15.8 15.5" fill="none" stroke="#fff" strokeWidth="1.2" />
+    </svg>
+  );
 }
 
-function BlueDieFace({ cells, connector }: { cells: Cell[]; connector: 'right' | 'left' }) {
-  const set = new Set(cells.map(([r, c]) => r + ',' + c));
+// ---------- Blaue Würfelseiten (echte Seiten, 2x2 + Halbkreis) ----------
+
+function BlueDieFace({ face, side }: { face: { cells: Cell[]; special?: string }; side: 'A' | 'B' }) {
+  const set = new Set(face.cells.map(([r, c]) => r + ',' + c));
   const squares = [];
   for (let r = 0; r < 2; r++) {
     for (let c = 0; c < 2; c++) {
@@ -62,17 +63,22 @@ function BlueDieFace({ cells, connector }: { cells: Cell[]; connector: 'right' |
     }
   }
   return (
-    <div className={'blue-die connector-' + connector}>
-      {squares}
+    <div className={'blue-die connector-' + (side === 'A' ? 'right' : 'left')}>
+      {face.special === 'zirkel' ? (
+        <div className="zirkel-face">
+          <ZirkelIcon />
+        </div>
+      ) : (
+        squares
+      )}
       <span className="connector-dot" />
     </div>
   );
 }
 
-// ---------- Ergebnis: kombinierte Form ----------
+// ---------- Kombinierte Gebäudeform ----------
 
-export function CombinedShape({ shapeId, type }: { shapeId: string; type: BuildingType }) {
-  const cells = SHAPE_BY_ID[shapeId].cells;
+function CombinedShape({ cells, type }: { cells: Cell[]; type: BuildingType }) {
   const maxR = Math.max(...cells.map((c) => c[0])) + 1;
   const maxC = Math.max(...cells.map((c) => c[1])) + 1;
   const set = new Set(cells.map(([r, c]) => r + ',' + c));
@@ -115,24 +121,32 @@ export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey
     );
   }
 
-  const shape = SHAPE_BY_ID[dice.shapeId];
-  const [left, right] = splitHalves(shape.cells);
+  const faceA = DIE_A_FACES[dice.a];
+  const faceB = DIE_B_FACES[dice.b];
+  const cells = combinedCells(dice.a, dice.b);
+  const hasZirkel = faceB.special === 'zirkel';
 
   return (
     <div className="dice-panel result-pop">
       <div className="dice-row">
-        <BlueDieFace cells={left} connector="right" />
-        <BlueDieFace cells={right} connector="left" />
+        <BlueDieFace face={faceA} side="A" />
+        <BlueDieFace face={faceB} side="B" />
         <span className="dice-eq">=</span>
-        <CombinedShape shapeId={dice.shapeId} type={dice.type} />
+        <CombinedShape cells={cells} type={dice.type} />
         <span className="dice-plus">+</span>
         <div className="white-die">
           <HouseIcon type={dice.type} />
         </div>
       </div>
       <div className="dice-label">
-        <b>{shape.name}</b> · {TYPE_NAME[dice.type]}
+        <b>{shapeName(cells)}</b> · {TYPE_NAME[dice.type]}
       </div>
+      {hasZirkel && (
+        <div className="dice-note">Zirkel: hat in Kapitel 1 keine Bedeutung (zählt als leere Seite)</div>
+      )}
+      {faceA.special === 'blank' && !hasZirkel && (
+        <div className="dice-note">Leere Seite: es zählt nur der andere Würfel</div>
+      )}
     </div>
   );
 }
