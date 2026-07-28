@@ -1,0 +1,247 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: #f3e9d2;
+  color: #2d2417;
+}
+
+.page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  text-align: center;
+  color: #7a2e1d;
+}
+
+h2 { font-size: 1.1rem; }
+h3 { font-size: 0.95rem; margin: 8px 0 4px; }
+
+.card {
+  background: #fdf7e7;
+  border: 1px solid #d9c9a3;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.card.center { text-align: center; }
+.center { text-align: center; }
+
+label { display: block; font-size: 0.85rem; margin-bottom: 4px; }
+
+input {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #c8b689;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+button {
+  padding: 10px 14px;
+  font-size: 1rem;
+  border: 1px solid #b09a6a;
+  border-radius: 10px;
+  background: #efe3c4;
+  color: #2d2417;
+  cursor: pointer;
+}
+
+button:disabled { opacity: 0.45; }
+
+button.primary {
+  background: #7a2e1d;
+  border-color: #5e2115;
+  color: #fff;
+}
+
+button.danger {
+  background: #fbe9e7;
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+button.big {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.15rem;
+  margin-top: 8px;
+}
+
+.row-buttons {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.row-buttons button { flex: 1; }
+
+.big-code {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  margin: 6px 0 12px;
+  color: #7a2e1d;
+}
+
+.hint { color: #7d6b4e; font-size: 0.88rem; }
+.error { color: #c0392b; font-weight: 600; }
+.error.small { font-size: 0.85rem; margin: 4px 0; }
+
+/* ---- Spielfeld ---- */
+
+.board {
+  display: grid;
+  gap: 1px;
+  background: #b09a6a;
+  border: 2px solid #8a744a;
+  border-radius: 6px;
+  overflow: hidden;
+  width: 100%;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(8px, 2.6vw, 14px);
+  position: relative;
+}
+
+.board-small .cell { font-size: 6px; }
+.board-small { max-width: 300px; }
+
+.cell-normal { background: #f8f0d8; }
+.cell-river { background: #8ecbe6; }
+.cell-mountain { background: #b5aa9a; }
+.cell-forest { background: #2f5d33; }
+
+.cell-icon { line-height: 1; pointer-events: none; }
+
+/* Gebäude */
+.built-wohn { background: #274b8f; }
+.built-gewerbe {
+  background: repeating-linear-gradient(
+    45deg,
+    #fdf7e7,
+    #fdf7e7 3px,
+    #274b8f 3px,
+    #274b8f 6px
+  );
+}
+.built-oeffentlich { background: #fdf7e7; }
+
+.x-mark {
+  color: #1e2f57;
+  font-weight: 900;
+  font-size: clamp(10px, 3vw, 18px);
+  pointer-events: none;
+}
+
+.built.b-top { border-top: 2px solid #16213e; }
+.built.b-bottom { border-bottom: 2px solid #16213e; }
+.built.b-left { border-left: 2px solid #16213e; }
+.built.b-right { border-right: 2px solid #16213e; }
+
+.preview-ok { outline: 3px solid #27ae60; outline-offset: -3px; background-color: rgba(39, 174, 96, 0.45); }
+.preview-bad { outline: 3px solid #c0392b; outline-offset: -3px; background-color: rgba(192, 57, 43, 0.45); }
+
+/* ---- Würfel ---- */
+
+.dice-area {
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.dice-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fdf7e7;
+  border: 1px solid #d9c9a3;
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+
+.dice-label { display: flex; flex-direction: column; gap: 2px; }
+.dice-label span { font-size: 0.85rem; color: #7d6b4e; }
+
+.mini-grid { display: grid; gap: 2px; }
+
+.mini-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-cell.filled { border: 1px solid #16213e; }
+.mini-cell.empty-mini { background: transparent; }
+.mini-cell .x-mark { font-size: 14px; }
+
+/* ---- Spiel-Screen ---- */
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #7d6b4e;
+  margin-bottom: 6px;
+}
+
+.controls { margin-top: 10px; }
+
+.opponent {
+  margin-top: 16px;
+  border-top: 1px dashed #b09a6a;
+  padding-top: 8px;
+}
+
+/* ---- Wertung ---- */
+
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fdf7e7;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.score-table th,
+.score-table td {
+  border: 1px solid #d9c9a3;
+  padding: 7px 9px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.score-table td:first-child { text-align: left; }
+.total-row { background: #f0e3bd; }
+
+.boards-final {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.boards-final > div { flex: 1; min-width: 220px; }
