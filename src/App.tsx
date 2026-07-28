@@ -41,6 +41,11 @@ export default function App() {
     localStorage.setItem('mc:name', name);
   }, [name]);
 
+  // Laufendes Spiel dauerhaft merken (übersteht jeden Reload)
+  useEffect(() => {
+    if (row?.code) localStorage.setItem('mc:current', row.code);
+  }, [row?.code]);
+
   // Nach einem Seiten-Reload (z. B. Pull-to-Refresh) laufendes Spiel wiederherstellen
   useEffect(() => {
     if (!supabase) return;
