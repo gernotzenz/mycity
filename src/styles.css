@@ -159,6 +159,18 @@ button.big {
 
 .svg-icon { width: 78%; height: 78%; pointer-events: none; }
 
+.img-icon {
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.img-stone { width: 72%; height: 72%; }
+.double-tree .img-icon { width: 52%; margin: 0 -3%; }
+
+.board.interactive { touch-action: none; }
+
 .double-tree {
   display: flex;
   width: 100%;

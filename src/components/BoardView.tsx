@@ -1,39 +1,22 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { BoardDef, CellType } from '../game/board';
 import type { Cell, Placement } from '../game/types';
 import { coveredMap } from '../game/rules';
+import treeUrl from '../assets/tree.png';
+import stoneUrl from '../assets/stone.svg';
 
 export type PreviewState = 'partial' | 'ok' | 'bad';
+export type DrawMode = 'add' | 'remove';
 
 interface Props {
   board: BoardDef;
   placements: Placement[];
   preview?: { cells: Cell[]; state: PreviewState } | null;
-  onTapCell?: (r: number, c: number) => void;
+  onDrawCell?: (r: number, c: number, mode: DrawMode) => void;
   small?: boolean;
 }
 
-// ---------- Detail-Icons ----------
-
-export function TreeIcon() {
-  return (
-    <svg viewBox="0 0 24 26" className="svg-icon">
-      <rect x="10.6" y="19" width="2.8" height="5" rx="1" fill="#7a5230" />
-      <path d="M12 1 L18.5 10 H15.5 L20.5 18.5 H3.5 L8.5 10 H5.5 Z" fill="#3e8e41" stroke="#245c28" strokeWidth="1" strokeLinejoin="round" />
-      <path d="M12 3.5 L16 9.5 H8 Z" fill="#57a75b" opacity="0.7" />
-    </svg>
-  );
-}
-
-function RockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="svg-icon">
-      <path d="M4 18 L7 11 L12 9 L16 12 L20 18 Z" fill="#9a9186" stroke="#5f574c" strokeWidth="1" strokeLinejoin="round" />
-      <path d="M7 11 L12 9 L13 13 L8 15 Z" fill="#b7aea1" />
-      <ellipse cx="7" cy="19.5" rx="4" ry="2" fill="#8b8276" opacity="0.7" />
-    </svg>
-  );
-}
+// ---------- Icons ----------
 
 function MountainIcon() {
   return (
@@ -69,16 +52,16 @@ const CELL_BG: Record<CellType, string> = {
 function cellIcon(t: CellType) {
   switch (t) {
     case 'T':
-      return <TreeIcon />;
+      return <img src={treeUrl} alt="" className="img-icon" draggable={false} />;
     case 'D':
       return (
         <span className="double-tree">
-          <TreeIcon />
-          <TreeIcon />
+          <img src={treeUrl} alt="" className="img-icon" draggable={false} />
+          <img src={treeUrl} alt="" className="img-icon" draggable={false} />
         </span>
       );
     case 'S':
-      return <RockIcon />;
+      return <img src={stoneUrl} alt="" className="img-icon img-stone" draggable={false} />;
     case 'M':
       return <MountainIcon />;
     case 'W':
@@ -124,7 +107,6 @@ function RiverOverlay({ board }: { board: BoardDef }) {
     if (chain[0][0] === 0) pts.unshift([pts[0][0], 0]);
     const last = chain[chain.length - 1];
     if (last[0] === board.h - 1) pts.push([pts[pts.length - 1][0], board.h * 100]);
-    // weiche Kurve durch Mittelpunkte (Catmull-Rom-artig über Quadratische Bézier)
     let path = `M ${pts[0][0]} ${pts[0][1]}`;
     for (let i = 1; i < pts.length - 1; i++) {
       const mx = (pts[i][0] + pts[i + 1][0]) / 2;
@@ -150,9 +132,47 @@ function RiverOverlay({ board }: { board: BoardDef }) {
 
 // ---------- Spielfeld ----------
 
-export default function BoardView({ board, placements, preview, onTapCell, small }: Props) {
+export default function BoardView({ board, placements, preview, onDrawCell, small }: Props) {
   const covered = coveredMap(placements);
   const previewSet = new Set((preview?.cells ?? []).map(([r, c]) => r + ',' + c));
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const strokeRef = useRef<{ mode: DrawMode; visited: Set<string> } | null>(null);
+
+  function cellAtPoint(clientX: number, clientY: number): Cell | null {
+    const el = boardRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const c = Math.floor(((clientX - rect.left) / rect.width) * board.w);
+    const r = Math.floor(((clientY - rect.top) / rect.height) * board.h);
+    if (r < 0 || r >= board.h || c < 0 || c >= board.w) return null;
+    return [r, c];
+  }
+
+  function handleDown(e: React.PointerEvent) {
+    if (!onDrawCell) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const cell = cellAtPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    const k = cell[0] + ',' + cell[1];
+    const mode: DrawMode = previewSet.has(k) ? 'remove' : 'add';
+    strokeRef.current = { mode, visited: new Set([k]) };
+    onDrawCell(cell[0], cell[1], mode);
+  }
+
+  function handleMove(e: React.PointerEvent) {
+    if (!onDrawCell || !strokeRef.current) return;
+    const cell = cellAtPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    const k = cell[0] + ',' + cell[1];
+    if (strokeRef.current.visited.has(k)) return;
+    strokeRef.current.visited.add(k);
+    onDrawCell(cell[0], cell[1], strokeRef.current.mode);
+  }
+
+  function handleUp() {
+    strokeRef.current = null;
+  }
 
   const cells = [];
   for (let r = 0; r < board.h; r++) {
@@ -173,11 +193,7 @@ export default function BoardView({ board, placements, preview, onTapCell, small
       if (previewSet.has(k)) classes.push('preview-' + preview!.state);
 
       cells.push(
-        <div
-          key={k}
-          className={classes.join(' ')}
-          onClick={onTapCell ? () => onTapCell(r, c) : undefined}
-        >
+        <div key={k} className={classes.join(' ')}>
           {placement?.type === 'oeffentlich' ? (
             <span className="x-mark">✕</span>
           ) : placement ? null : (
@@ -190,7 +206,15 @@ export default function BoardView({ board, placements, preview, onTapCell, small
 
   return (
     <div className={'board-frame' + (small ? ' board-small' : '')}>
-      <div className="board" style={{ gridTemplateColumns: `repeat(${board.w}, 1fr)` }}>
+      <div
+        ref={boardRef}
+        className={'board' + (onDrawCell ? ' interactive' : '')}
+        style={{ gridTemplateColumns: `repeat(${board.w}, 1fr)` }}
+        onPointerDown={handleDown}
+        onPointerMove={handleMove}
+        onPointerUp={handleUp}
+        onPointerCancel={handleUp}
+      >
         {cells}
         <RiverOverlay board={board} />
       </div>

@@ -317,15 +317,20 @@ function GameScreen({
     return s;
   }, [me.placements]);
 
-  function toggleCell(r: number, c: number) {
+  // Zeichnen per Tippen ODER Wischen: 'add' fügt Felder hinzu, 'remove'
+  // (Start auf markiertem Feld) radiert entlang der Bewegung.
+  function drawCell(r: number, c: number, mode: 'add' | 'remove') {
     const t = board.grid[r][c];
     const k = r + ',' + c;
-    if (occupied.has(k)) return;
-    if (t === '~' || t === 'M' || t === 'F') return; // Fluss/Gebirge/Wald nicht antippbar
     setMarked((prev) => {
       const idx = prev.findIndex(([pr, pc]) => pr === r && pc === c);
-      if (idx >= 0) return prev.filter((_, i) => i !== idx);
-      if (prev.length >= targetCells.length) return prev; // schon genug Felder markiert
+      if (mode === 'remove') {
+        return idx >= 0 ? prev.filter((_, i) => i !== idx) : prev;
+      }
+      if (idx >= 0) return prev; // schon markiert
+      if (occupied.has(k)) return prev;
+      if (t === '~' || t === 'M' || t === 'F') return prev; // Fluss/Gebirge/Wald
+      if (prev.length >= targetCells.length) return prev; // schon genug Felder
       return [...prev, [r, c] as Cell];
     });
   }
@@ -408,7 +413,7 @@ function GameScreen({
             ? { cells: marked, state: !complete ? 'partial' : canConfirm ? 'ok' : 'bad' }
             : null
         }
-        onTapCell={canAct ? toggleCell : undefined}
+        onDrawCell={canAct ? drawCell : undefined}
       />
 
       {canAct && (
