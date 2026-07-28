@@ -213,7 +213,8 @@ export default function App() {
   if (!row) {
     return (
       <div className="page">
-        <h1>My City – Würfelspiel</h1>
+        <h1 className="logo">My City</h1>
+        <p className="tagline">Würfelspiel · Kapitel 1</p>
         <div className="card">
           <label>Dein Name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
@@ -355,7 +356,10 @@ function GameScreen({
 
       <div className="dice-area">
         {shared.dice ? (
-          <DicePanel dice={shared.dice} />
+          <DicePanel
+            dice={shared.dice}
+            rollKey={shared.round + '-' + shared.dice.shapeId + '-' + shared.dice.type}
+          />
         ) : me.finished ? (
           <p className="hint">Du hast dein Spiel beendet – warte auf {other?.name ?? 'Mitspieler'} …</p>
         ) : myTurnToRoll ? (

@@ -21,15 +21,14 @@ export interface BoardDef {
 }
 
 const SPIEL_1_LAYOUT = [
-  'TTTTT~TTTTTT',
-  'S....~....FF',
-  'M...~~.D..FF',
-  'MM..~....S..',
-  '.D.~~.......',
-  'S..~.S..D..F',
-  '..~~..S..FFF',
-  '..~..S...FFF',
-  '..~......FFF',
+  'TTTTT~TTTTF',
+  'S...~~..D.F',
+  'M...~.D..S.',
+  'MM..~~.....',
+  '.S...~....F',
+  '..D.~~.D.FF',
+  'S..~~..S.FF',
+  '...~.SFFFFF',
 ];
 
 function parse(layout: string[]): BoardDef {
@@ -44,7 +43,7 @@ export const BOARD_SPIEL_2 = parse(SPIEL_1_LAYOUT);
 
 // Spiel 3: Brunnen "im Osten der Siedlung".
 const SPIEL_3_LAYOUT = SPIEL_1_LAYOUT.map((row, r) =>
-  r === 4 ? row.slice(0, 8) + 'W' + row.slice(9) : row
+  r === 3 ? row.slice(0, 7) + 'W' + row.slice(8) : row
 );
 export const BOARD_SPIEL_3 = parse(SPIEL_3_LAYOUT);
 
