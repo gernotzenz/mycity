@@ -120,8 +120,8 @@ export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey
       {hasZirkel && (
         <div className="dice-note">Zirkel: hat in Kapitel 1 keine Bedeutung (zählt als leere Seite)</div>
       )}
-      {faceA.special === 'blank' && !hasZirkel && (
-        <div className="dice-note">Leere Seite: es zählt nur der andere Würfel</div>
+      {faceB.special === 'blank' && (
+        <div className="dice-note">Leere Seite: es zählt nur der linke Würfel</div>
       )}
     </div>
   );

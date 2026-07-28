@@ -41,6 +41,34 @@ export default function App() {
     localStorage.setItem('mc:name', name);
   }, [name]);
 
+  // Nach einem Seiten-Reload (z. B. Pull-to-Refresh) laufendes Spiel wiederherstellen
+  useEffect(() => {
+    if (!supabase) return;
+    const code = localStorage.getItem('mc:current');
+    if (!code) return;
+    const savedSeat = localStorage.getItem('mc:seat:' + code);
+    if (savedSeat !== '1' && savedSeat !== '2') return;
+    supabase
+      .from('games')
+      .select('*')
+      .eq('code', code)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setSeat(Number(savedSeat) as 1 | 2);
+          setRow(data as GameRow);
+        } else {
+          localStorage.removeItem('mc:current');
+        }
+      });
+  }, []);
+
+  function leaveGame() {
+    if (!confirm('Zur Startseite? Mit dem Spiel-Code kannst du jederzeit wieder beitreten.')) return;
+    localStorage.removeItem('mc:current');
+    setRow(null);
+  }
+
   // ---- Sync: Realtime + Polling-Fallback ----
   useEffect(() => {
     if (!supabase || !row) return;
@@ -135,6 +163,7 @@ export default function App() {
       return;
     }
     localStorage.setItem('mc:seat:' + code, '1');
+    localStorage.setItem('mc:current', code);
     setSeat(1);
     setRow(data as GameRow);
   }
@@ -151,6 +180,7 @@ export default function App() {
     const g = data as GameRow;
     const savedSeat = localStorage.getItem('mc:seat:' + code);
     if (savedSeat === '1' || savedSeat === '2') {
+      localStorage.setItem('mc:current', code);
       setSeat(Number(savedSeat) as 1 | 2);
       setRow(g);
       return;
@@ -162,6 +192,7 @@ export default function App() {
     const p2 = newPlayer(name || 'Spieler 2');
     await supabase.from('games').update({ p2 }).eq('code', code);
     localStorage.setItem('mc:seat:' + code, '2');
+    localStorage.setItem('mc:current', code);
     setSeat(2);
     setRow({ ...g, p2 });
   }
@@ -266,16 +297,82 @@ export default function App() {
             </button>
           )}
           {seat === 2 && <p className="hint">Warte, bis {row.p1?.name} startet …</p>}
+          <button onClick={leaveGame}>Verlassen</button>
         </div>
       </div>
     );
   }
 
   if (row.shared.status === 'scoring') {
-    return <ScoringScreen row={row} seat={seat} onRestart={restart} />;
+    return <ScoringScreen row={row} seat={seat} onRestart={restart} onLeave={leaveGame} />;
   }
 
-  return <GameScreen row={row} seat={seat} onRoll={doRoll} updateMe={updateMe} />;
+  return (
+    <GameScreen row={row} seat={seat} onRoll={doRoll} updateMe={updateMe} onLeave={leaveGame} />
+  );
+}
+
+// ---------------- Regel-Info ----------------
+
+function RulesModal({ gameNo, onClose }: { gameNo: 1 | 2 | 3; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Kapitel 1 · Spiel {gameNo}</h2>
+        {gameNo === 1 && (
+          <p className="story">
+            <i>
+              Als erste Siedler habt ihr das neue Land erreicht und errichtet eure Gebäude
+              entlang des Flusses.
+            </i>
+          </p>
+        )}
+        {gameNo === 2 && (
+          <p className="story">
+            <i>
+              Eure Gemeinde einigt sich auf ein geplantes Vorgehen – nun entstehen geordnete
+              Stadtviertel.
+            </i>
+          </p>
+        )}
+        {gameNo === 3 && (
+          <p className="story">
+            <i>
+              Um die Wasserversorgung zu verbessern, wird im Osten ein Brunnen gebohrt, von dem
+              möglichst viele Gebäude profitieren sollen.
+            </i>
+          </p>
+        )}
+        <h3>Bauregeln</h3>
+        <ul>
+          <li>Das erste Gebäude muss mit einer Seite an den Fluss angrenzen.</li>
+          <li>Jedes weitere Gebäude muss an ein vorhandenes angrenzen (auch über den Fluss hinweg).</li>
+          <li>Nicht über den Fluss bauen; Gebirge und Wald sind gesperrt.</li>
+          <li>Bäume und Steine dürfen überbaut werden.</li>
+          <li>Passen kostet: −1 / −2 / −3 / −5 / −7 / −10 (max. 6-mal).</li>
+          <li>Nach jedem Wurf darfst du dein Spiel freiwillig beenden.</li>
+        </ul>
+        <h3>Wertung</h3>
+        <ul>
+          <li>Jeder freie Baum: +1</li>
+          <li>Jeder nicht überbaute Stein: −1</li>
+          <li>Jedes leere Feld: −1</li>
+          {gameNo >= 2 && (
+            <li>
+              Je Gebäudeart: +1 Punkt pro Gebäude in der größten zusammenhängenden Gruppe dieser
+              Art.
+            </li>
+          )}
+          {gameNo >= 3 && (
+            <li>Brunnen: +4, wenn 4 Gebäude seitlich angrenzen (überbaut bringt er nichts).</li>
+          )}
+        </ul>
+        <button className="primary big" onClick={onClose}>
+          Verstanden
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------- Spiel-Screen ----------------
@@ -285,12 +382,15 @@ function GameScreen({
   seat,
   onRoll,
   updateMe,
+  onLeave,
 }: {
   row: GameRow;
   seat: 1 | 2;
   onRoll: () => void;
   updateMe: (patch: Partial<PlayerState>) => Promise<void>;
+  onLeave: () => void;
 }) {
+  const [showRules, setShowRules] = useState(false);
   const shared = row.shared;
   const board = useMemo(() => boardForGame(shared.gameNo), [shared.gameNo]);
   const me = seat === 1 ? row.p1! : row.p2!;
@@ -383,10 +483,17 @@ function GameScreen({
   return (
     <div className="page game">
       <header className="game-header">
-        <span>Kapitel 1 · Spiel {shared.gameNo}</span>
+        <button className="icon-btn" onClick={() => setShowRules(true)} aria-label="Regeln">
+          ⓘ
+        </button>
+        <span>Spiel {shared.gameNo}</span>
         <span>Runde {shared.round}</span>
         <span>Passen: {me.passes}/6</span>
+        <button className="icon-btn" onClick={onLeave} aria-label="Verlassen">
+          ✕
+        </button>
       </header>
+      {showRules && <RulesModal gameNo={shared.gameNo} onClose={() => setShowRules(false)} />}
 
       <div className="dice-area">
         {shared.dice ? (
@@ -461,10 +568,12 @@ function ScoringScreen({
   row,
   seat,
   onRestart,
+  onLeave,
 }: {
   row: GameRow;
   seat: 1 | 2;
   onRestart: (gameNo: 1 | 2 | 3) => void;
+  onLeave: () => void;
 }) {
   const board = boardForGame(row.shared.gameNo);
   const players = [row.p1, row.p2].filter(Boolean) as PlayerState[];
@@ -566,6 +675,9 @@ function ScoringScreen({
           </div>
         </div>
       )}
+      <button className="big" onClick={onLeave}>
+        Zur Startseite
+      </button>
     </div>
   );
 }

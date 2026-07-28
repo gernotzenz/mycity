@@ -123,9 +123,9 @@ function RiverOverlay({ board }: { board: BoardDef }) {
       viewBox={`0 0 ${board.w * 100} ${board.h * 100}`}
       preserveAspectRatio="none"
     >
-      <path d={d} fill="none" stroke="#3e88ad" strokeWidth="92" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke="#79c6e3" strokeWidth="76" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke="#b6e4f2" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" />
+      <path d={d} fill="none" stroke="#3e88ad" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="#79c6e3" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="#b6e4f2" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" />
     </svg>
   );
 }

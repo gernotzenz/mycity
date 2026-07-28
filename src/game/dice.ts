@@ -19,34 +19,34 @@ export interface DieFace {
   special?: 'blank' | 'zirkel';
 }
 
+// Rekonstruiert nach der 36er-Auszählung der Original-Würfel
+// (Einer 11,1 % · Zweier 22,2 % · Dreier-Reihe 8,3 % · Vierer-Reihe 2,7 %
+//  · Dreier-L 22,2 % · Vierer-L 13,8 % · U-Gebäude 5,5 %):
+// Würfel A hat keine Leerseite; Leerseite UND Zirkel liegen auf Würfel B.
 export const DIE_A_FACES: DieFace[] = [
+  { id: 'a-winkel', cells: [[0, 0], [1, 0], [1, 1]] },
+  { id: 'a-senkrecht-1', cells: [[0, 1], [1, 1]] },
+  { id: 'a-senkrecht-2', cells: [[0, 1], [1, 1]] },
   { id: 'a-einzel-1', cells: [[1, 1]] },
   { id: 'a-einzel-2', cells: [[1, 1]] },
-  { id: 'a-senkrecht', cells: [[0, 1], [1, 1]] },
   { id: 'a-waagrecht', cells: [[1, 0], [1, 1]] },
-  { id: 'a-winkel', cells: [[0, 1], [1, 0], [1, 1]] },
-  { id: 'a-leer', cells: [], special: 'blank' },
 ];
 
 export const DIE_B_FACES: DieFace[] = [
-  { id: 'b-einzel-1', cells: [[1, 0]] },
-  { id: 'b-einzel-2', cells: [[1, 0]] },
-  { id: 'b-senkrecht', cells: [[0, 0], [1, 0]] },
+  { id: 'b-einzel', cells: [[1, 0]] },
+  { id: 'b-senkrecht-1', cells: [[0, 0], [1, 0]] },
+  { id: 'b-senkrecht-2', cells: [[0, 0], [1, 0]] },
   { id: 'b-waagrecht', cells: [[1, 0], [1, 1]] },
-  { id: 'b-winkel', cells: [[0, 0], [1, 0], [1, 1]] },
+  { id: 'b-leer', cells: [], special: 'blank' },
   { id: 'b-zirkel', cells: [], special: 'zirkel' },
 ];
 
 const BUILDING_TYPES: BuildingType[] = ['wohn', 'gewerbe', 'oeffentlich'];
 
 export function rollDice(): DiceResult {
-  // Leerseite + Zirkel gleichzeitig ergäbe kein Gebäude -> neu würfeln
-  let a = 0;
-  let b = 0;
-  do {
-    a = Math.floor(Math.random() * 6);
-    b = Math.floor(Math.random() * 6);
-  } while (DIE_A_FACES[a].cells.length === 0 && DIE_B_FACES[b].cells.length === 0);
+  // Würfel A zeigt immer Quadrate, daher entsteht immer ein Gebäude.
+  const a = Math.floor(Math.random() * 6);
+  const b = Math.floor(Math.random() * 6);
   const type = BUILDING_TYPES[Math.floor(Math.random() * 3)];
   return { a, b, type };
 }
@@ -72,8 +72,8 @@ export function shapeName(cells: Cell[]): string {
     if (h === 2 && w === 2) return 'Quadrat';
     return 'Vierer-L';
   }
-  if (n === 5) return 'Fünfer-Gebäude';
-  return 'U-Gebäude';
+  if (n === 5) return h * w === 6 ? 'U-Gebäude' : 'Fünfer-L';
+  return 'Großes Gebäude';
 }
 
 // ---- Formen-Transformationen (drehen & spiegeln erlaubt) ----
