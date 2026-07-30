@@ -21,7 +21,8 @@ function randomCode(): string {
 
 function bothDone(shared: SharedState, p1: PlayerState | null, p2: PlayerState | null): boolean {
   const done = (p: PlayerState | null) => !!p && (p.finished || p.doneRound >= shared.round);
-  return done(p1) && done(p2);
+  // Im Solo-Modus (kein zweiter Spieler) zählt nur Spieler 1.
+  return done(p1) && (p2 ? done(p2) : true);
 }
 
 // ---------------- App ----------------
@@ -33,6 +34,7 @@ export default function App() {
   const [joinCode, setJoinCode] = useState<string>(
     () => new URLSearchParams(location.search).get('code')?.toUpperCase() ?? ''
   );
+  const [soloMode, setSoloMode] = useState(false);
   const [error, setError] = useState<string>('');
   const rowRef = useRef<GameRow | null>(null);
   rowRef.current = row;
@@ -120,7 +122,7 @@ export default function App() {
     if (advancerSeat !== seat) return;
     if (!bothDone(row.shared, row.p1, row.p2)) return;
     const p1f = row.p1?.finished ?? false;
-    const p2f = row.p2?.finished ?? false;
+    const p2f = row.p2 ? row.p2.finished : true; // Solo: nur Spieler 1 zählt
     if (p1f && p2f) {
       persist({ shared: { ...row.shared, status: 'scoring', dice: null } });
     } else {
@@ -146,24 +148,25 @@ export default function App() {
   // Beide fertig → Wertung (falls der Würfelnde offline ist, greift das hier auch)
   useEffect(() => {
     if (!row || row.shared.status !== 'playing') return;
-    if (row.p1?.finished && row.p2?.finished) {
+    if (row.p1?.finished && (row.p2 ? row.p2.finished : true)) {
       persist({ shared: { ...row.shared, status: 'scoring', dice: null } });
     }
   }, [row, persist]);
 
   // ---- Aktionen ----
 
-  async function createGame(gameNo: number) {
+  async function createGame(gameNo: number, solo = false) {
     if (!supabase) return;
     setError('');
     const code = randomCode();
     const shared: SharedState = {
-      status: 'lobby',
+      status: solo ? 'playing' : 'lobby', // Solo startet sofort
       gameNo,
-      round: 0,
+      round: solo ? 1 : 0,
       rollerSeat: 1,
       dice: null,
       churchesUsed: 0,
+      solo,
     };
     const { data, error: err } = await supabase
       .from('games')
@@ -195,6 +198,10 @@ export default function App() {
       localStorage.setItem('mc:current', code);
       setSeat(Number(savedSeat) as 1 | 2);
       setRow(g);
+      return;
+    }
+    if (g.shared.solo) {
+      setError('Das ist ein Solo-Spiel – Beitreten ist nicht möglich.');
       return;
     }
     if (g.p2) {
@@ -257,6 +264,7 @@ export default function App() {
         rollerSeat: 1,
         dice: null,
         churchesUsed: 0,
+        solo: row.shared.solo,
       },
       p1: row.p1 ? newPlayer(row.p1.name) : null,
       p2: row.p2 ? newPlayer(row.p2.name) : null,
@@ -293,18 +301,29 @@ export default function App() {
         </div>
         <div className="card">
           <h2>Neues Spiel</h2>
+          <div className="row-buttons">
+            <button className={!soloMode ? 'primary' : ''} onClick={() => setSoloMode(false)}>
+              👥 Zwei Spieler
+            </button>
+            <button className={soloMode ? 'primary' : ''} onClick={() => setSoloMode(true)}>
+              🎲 Solo
+            </button>
+          </div>
           <p className="hint">Kapitel 1: Das neue Land</p>
           <div className="row-buttons">
-            <button className="primary" onClick={() => createGame(1)}>Spiel 1</button>
-            <button onClick={() => createGame(2)}>Spiel 2</button>
-            <button onClick={() => createGame(3)}>Spiel 3</button>
+            <button className="primary" onClick={() => createGame(1, soloMode)}>Spiel 1</button>
+            <button onClick={() => createGame(2, soloMode)}>Spiel 2</button>
+            <button onClick={() => createGame(3, soloMode)}>Spiel 3</button>
           </div>
           <p className="hint">Kapitel 2: Die Kirchen</p>
           <div className="row-buttons">
-            <button onClick={() => createGame(4)}>Spiel 4</button>
-            <button onClick={() => createGame(5)}>Spiel 5</button>
-            <button onClick={() => createGame(6)}>Spiel 6</button>
+            <button onClick={() => createGame(4, soloMode)}>Spiel 4</button>
+            <button onClick={() => createGame(5, soloMode)}>Spiel 5</button>
+            <button onClick={() => createGame(6, soloMode)}>Spiel 6</button>
           </div>
+          {soloMode && (
+            <p className="hint">Solo: du spielst allein und wirst am Ende über die Erfolgstabelle bewertet.</p>
+          )}
         </div>
         <div className="card">
           <h2>Spiel beitreten</h2>
@@ -650,9 +669,26 @@ function GameScreen({
   );
 }
 
+// Erfolgstabelle für das Solo-Spiel (Kapitel 1 und 2 laut Anleitung)
+function soloRank(points: number): string {
+  const ranks: [number, string][] = [
+    [70, 'Ehrenbürger/in'],
+    [60, 'Bürgermeister/in'],
+    [50, 'Gemeinderat/-rätin'],
+    [42, 'Bauinspektor/in'],
+    [34, 'Meister/in'],
+    [26, 'Geselle/Gesellin'],
+    [18, 'Hilfskraft'],
+    [10, 'Einsiedler/in'],
+  ];
+  for (const [min, title] of ranks) if (points >= min) return title;
+  return 'Landstreicher/in';
+}
+
 // ---------------- Zwischenstand (Kapitel-Gesamtrechnung) ----------------
 
 function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: number[] }) {
+  const hasP2 = !!row.p2;
   const entries: HistoryEntry[] = [
     ...(row.history ?? []),
     { gameNo: row.shared.gameNo, p1: currentTotals[0] ?? 0, p2: currentTotals[1] ?? 0 },
@@ -674,7 +710,7 @@ function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: nu
           <tr>
             <th></th>
             <th>{names[0]}</th>
-            <th>{names[1]}</th>
+            {hasP2 && <th>{names[1]}</th>}
           </tr>
         </thead>
         <tbody>
@@ -687,6 +723,7 @@ function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: nu
                 chapter={ch}
                 entries={inChapter}
                 chapterSum={[c1, c2]}
+                hasP2={hasP2}
               />
             );
           })}
@@ -695,9 +732,11 @@ function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: nu
             <td>
               <b>{totalP1}</b>
             </td>
-            <td>
-              <b>{totalP2}</b>
-            </td>
+            {hasP2 && (
+              <td>
+                <b>{totalP2}</b>
+              </td>
+            )}
           </tr>
         </tbody>
       </table>
@@ -713,10 +752,12 @@ function FragmentRows({
   chapter,
   entries,
   chapterSum,
+  hasP2,
 }: {
   chapter: number;
   entries: HistoryEntry[];
   chapterSum: number[];
+  hasP2: boolean;
 }) {
   return (
     <>
@@ -724,7 +765,7 @@ function FragmentRows({
         <tr key={chapter + '-' + i}>
           <td>Spiel {e.gameNo}</td>
           <td>{e.p1}</td>
-          <td>{e.p2}</td>
+          {hasP2 && <td>{e.p2}</td>}
         </tr>
       ))}
       <tr className="chapter-row">
@@ -732,9 +773,11 @@ function FragmentRows({
         <td>
           <b>{chapterSum[0]}</b>
         </td>
-        <td>
-          <b>{chapterSum[1]}</b>
-        </td>
+        {hasP2 && (
+          <td>
+            <b>{chapterSum[1]}</b>
+          </td>
+        )}
       </tr>
     </>
   );
@@ -756,14 +799,21 @@ function ScoringScreen({
   const board = boardForGame(row.shared.gameNo);
   const players = [row.p1, row.p2].filter(Boolean) as PlayerState[];
   const scores = players.map((p) => scoreGame(board, p, row.shared.gameNo));
-  const winner =
-    scores.length === 2
-      ? scores[0].total === scores[1].total
-        ? 'Unentschieden!'
-        : scores[0].total > scores[1].total
-          ? `${players[0].name} gewinnt!`
-          : `${players[1].name} gewinnt!`
-      : '';
+  const isSolo = players.length === 1;
+
+  // Solo: Bewertung über die Erfolgstabelle der Anleitung (Kapitelsumme)
+  const chapterNo = chapterOf(row.shared.gameNo);
+  const chapterTotal =
+    (row.history ?? [])
+      .filter((e) => chapterOf(e.gameNo) === chapterNo)
+      .reduce((a, e) => a + e.p1, 0) + (scores[0]?.total ?? 0);
+  const winner = isSolo
+    ? `Kapitel ${chapterNo}: ${chapterTotal} Punkte – „${soloRank(chapterTotal)}“`
+    : scores[0].total === scores[1].total
+      ? 'Unentschieden!'
+      : scores[0].total > scores[1].total
+        ? `${players[0].name} gewinnt!`
+        : `${players[1].name} gewinnt!`;
 
   return (
     <div className="page">

@@ -31,6 +31,7 @@ export interface SharedState {
   rollerSeat: 1 | 2;
   dice: DiceResult | null;
   churchesUsed: number; // wie viele Kirchen-Kreise schon ausgemalt sind
+  solo?: boolean; // Einzelspieler-Modus
 }
 
 export interface HistoryEntry {
