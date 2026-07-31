@@ -185,27 +185,33 @@ const SPIEL_7_LAYOUT = [
 const RIVER_7: RiverPoint[] = [[4, 3], [4, 2], [6, 2], [6, 1], [8, 1]];
 
 // Spiel 8: Waldfelder (F) dürfen/sollen überbaut werden.
-// Karte nach dem frontalen Foto von Blatt 8.
+// Karte per Rasterkalibrierung vom frontalen Foto abgenommen:
+// Steine entlang des Flusses (Spalte 3, Zeilen 0-2 + Zeile 5),
+// grüne Waldfelder rund ums Gebirge, Waldblock unten rechts,
+// Sägewerk (7,7)+(7,8).
 const SPIEL_8_LAYOUT = [
-  '...S.D....F',
+  '...S.D....S',
   'F..S....D.F',
-  'F..S..D...F',
-  'MM........F',
-  'MF......D.F',
-  'F.....D..FF',
-  '.SD..S...FF',
-  'SS....ZZ.FF',
+  'MF.S..D..DF',
+  'MM........S',
+  'MF.......D.',
+  'F.DSS.D..FF',
+  'SS.......FF',
+  '.......ZZFF',
 ];
-const RIVER_8: RiverPoint[] = [[0, 4], [2, 4], [2, 3], [4, 3], [4, 5], [6, 5], [6, 0]];
+// Fluss: oben zwischen c3|c4 hinein, Zeilen 0-2 an den Steinen entlang,
+// Links-Knick (Zeile 3), Rechts-Schleife (Zeile 4), dann langer Lauf
+// unter Zeile 5 nach links aus dem Blatt hinaus.
+const RIVER_8: RiverPoint[] = [[0, 4], [3, 4], [3, 3], [4, 3], [4, 5], [6, 5], [6, 0]];
 
-// Spiel 9: gleiche Karte wie Spiel 8, aber 5 Felder zeigen Gold (G);
-// Wald weiterhin bebaubar; Zirkel ohne Bedeutung.
+// Spiel 9: gleiche Karte wie Spiel 8, aber 5 Felder zeigen Gold (G) –
+// vor allem die grünen Felder am Gebirge; Zirkel ohne Bedeutung.
 const SPIEL_9_LAYOUT = SPIEL_8_LAYOUT.map((row, r) => {
   const set = (s: string, c: number) => s.slice(0, c) + 'G' + s.slice(c + 1);
   let out = row;
   if (r === 0) out = set(out, 3);
   if (r === 1) out = set(out, 0);
-  if (r === 2) out = set(out, 0);
+  if (r === 2) out = set(out, 1);
   if (r === 4) out = set(out, 1);
   if (r === 7) out = set(out, 0);
   return out;

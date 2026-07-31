@@ -20,6 +20,7 @@ import type { Cell, GameRow, HistoryEntry, PlayerState, SharedState } from './ga
 import { BUILDING_LABEL, MAX_PASSES, chapterOf } from './game/types';
 import BoardView from './components/BoardView';
 import DicePanel from './components/DicePanel';
+import MapEditor from './components/MapEditor';
 
 // ---------------- Hilfsfunktionen ----------------
 
@@ -48,6 +49,7 @@ export default function App() {
     () => new URLSearchParams(location.search).get('code')?.toUpperCase() ?? ''
   );
   const [soloMode, setSoloMode] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
   const [error, setError] = useState<string>('');
   const rowRef = useRef<GameRow | null>(null);
   rowRef.current = row;
@@ -335,11 +337,15 @@ export default function App() {
     );
   }
 
+  if (showEditor) {
+    return <MapEditor onClose={() => setShowEditor(false)} />;
+  }
+
   if (!row) {
     return (
       <div className="page">
         <h1 className="logo">My City</h1>
-        <p className="tagline">Würfelspiel · Kapitel 1</p>
+        <p className="tagline">Würfelspiel</p>
         <div className="card">
           <label>Dein Name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
@@ -395,6 +401,9 @@ export default function App() {
           </button>
         </div>
         {error && <p className="error">{error}</p>}
+        <p className="center">
+          <button onClick={() => setShowEditor(true)}>🛠 Karten-Editor</button>
+        </p>
       </div>
     );
   }

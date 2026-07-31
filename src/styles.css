@@ -271,6 +271,29 @@ button.big {
 }
 .fort-mark { color: #8a4a2b; font-weight: 900; }
 
+/* ---- Karten-Editor ---- */
+
+.row-buttons.wrap { flex-wrap: wrap; }
+.row-buttons.wrap button { flex: 0 0 auto; padding: 6px 10px; font-size: 0.85rem; }
+
+.editor-cell {
+  cursor: pointer;
+  font-size: clamp(8px, 2.4vw, 13px);
+  font-weight: 700;
+  color: #2d2417;
+}
+
+.editor-textarea {
+  width: 100%;
+  font-family: monospace;
+  font-size: 0.8rem;
+  border: 1px solid #c8b689;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
 .built.b-top { border-top: 2.5px solid #16213e; }
 .built.b-bottom { border-bottom: 2.5px solid #16213e; }
 .built.b-left { border-left: 2.5px solid #16213e; }
