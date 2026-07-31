@@ -106,16 +106,20 @@ const SPIEL_1_LAYOUT = [
   'S.......SFF',
   '.....S.FFFF',
 ];
+// Flusslauf (per Rasterkalibrierung vom Foto abgenommen):
+// oben zwischen c4|c5 hinein (x5), Zeilen 2-3 links (x4),
+// Zeilen 4-5 rechts (x5), Zeile 6 links (x4), Austritt unten an der
+// linken oberen Ecke des Steins (7,5) -> x5.
 const RIVER_1: RiverPoint[] = [
   [0, 5],
   [2, 5],
-  [2, 6],
-  [3, 6],
-  [3, 5],
-  [4, 5],
+  [2, 4],
   [4, 4],
-  [6, 4],
+  [4, 5],
   [6, 5],
+  [6, 4],
+  [7, 4],
+  [7, 5],
   [8, 5],
 ];
 
