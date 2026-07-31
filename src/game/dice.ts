@@ -41,14 +41,49 @@ export const DIE_B_FACES: DieFace[] = [
   { id: 'b-zirkel', cells: [], special: 'zirkel' },
 ];
 
-// Kirchenformen von Kapitel 2 in der Reihenfolge der Zeile "Kirche bauen"
-// (laut Anleitung S. 7): Zweier, Kreuz, Zweier-L, T-Form.
-export const CHURCH_SHAPES: Cell[][] = [
-  [[0, 0], [0, 1]],
-  [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
-  [[0, 0], [0, 1], [1, 0]],
-  [[0, 0], [0, 1], [0, 2], [1, 1]],
-];
+// Kirchenformen je Spiel in der Reihenfolge der Zeile "Kirche bauen".
+// Kapitel 2 (laut Anleitung S. 7): Zweier, Kreuz, Zweier-L, T-Form.
+// Spiele 7+8 (Kapitel 3): Formen von den Spielblättern – NÄHERUNG, bitte mit
+// Foto der Zeile "Kirche bauen" der Blätter 7/8 verifizieren!
+export const CHURCH_SHAPES_BY_GAME: Record<number, Cell[][]> = {
+  4: [
+    [[0, 0], [0, 1]],
+    [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
+    [[0, 0], [0, 1], [1, 0]],
+    [[0, 0], [0, 1], [0, 2], [1, 1]],
+  ],
+  5: [
+    [[0, 0], [0, 1]],
+    [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
+    [[0, 0], [0, 1], [1, 0]],
+    [[0, 0], [0, 1], [0, 2], [1, 1]],
+  ],
+  6: [
+    [[0, 0], [0, 1]],
+    [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
+    [[0, 0], [0, 1], [1, 0]],
+    [[0, 0], [0, 1], [0, 2], [1, 1]],
+  ],
+  // Spiel 7: "Der sumpfige Boden ermöglicht nur noch den Bau kleiner Kirchen."
+  7: [
+    [[0, 0]],
+    [[0, 0], [0, 1]],
+    [[0, 0], [0, 1], [1, 0]],
+  ],
+  // Spiel 8: "Mit dem gewonnenen Holz werden die letzten Kirchenbauten erstellt."
+  8: [
+    [[0, 0], [0, 1], [0, 2], [1, 1]],
+    [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
+  ],
+};
+
+export function churchShapesFor(gameNo: number): Cell[][] {
+  return CHURCH_SHAPES_BY_GAME[gameNo] ?? [];
+}
+
+// Festung (Kapitel 4): ein einzelnes Feld, beliebig platzierbar.
+export const FORT_SHAPE: Cell[] = [[0, 0]];
+export const FORT_COUNT = 4;
 
 const BUILDING_TYPES: BuildingType[] = ['wohn', 'gewerbe', 'oeffentlich'];
 

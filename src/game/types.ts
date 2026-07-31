@@ -1,5 +1,5 @@
 export type BuildingType = 'wohn' | 'gewerbe' | 'oeffentlich';
-export type PlacementType = BuildingType | 'kirche';
+export type PlacementType = BuildingType | 'kirche' | 'festung';
 
 export type Cell = [number, number]; // [row, col]
 
@@ -15,22 +15,25 @@ export interface PlayerState {
   passes: number;
   finished: boolean;
   doneRound: number; // letzte Runde, in der der Spieler gehandelt hat
+  bandits?: Cell[]; // aus dem Vorspiel übertragene Banditen (Kapitel 4)
 }
 
 export interface DiceResult {
   a: number; // Seite von Würfel A (0-5)
   b: number; // Seite von Würfel B (0-5)
   type: BuildingType;
-  church?: number | null; // Kirchen-Index, wenn Zirkel gewürfelt (ab Spiel 4)
+  church?: number | null; // Kirchen-Index, wenn Zirkel gewürfelt (Spiele 4-8)
+  fort?: boolean; // Festung bauen, wenn Zirkel gewürfelt (Spiele 11-12)
 }
 
 export interface SharedState {
   status: 'lobby' | 'playing' | 'scoring';
-  gameNo: number; // 1-6
+  gameNo: number; // 1-12
   round: number;
   rollerSeat: 1 | 2;
   dice: DiceResult | null;
   churchesUsed: number; // wie viele Kirchen-Kreise schon ausgemalt sind
+  fortsUsed?: number; // wie viele Festungs-Kreise schon ausgemalt sind
   solo?: boolean; // Einzelspieler-Modus
 }
 
@@ -38,6 +41,8 @@ export interface HistoryEntry {
   gameNo: number;
   p1: number;
   p2: number;
+  p1Bags?: number; // Geldbeutel (Kapitel 3)
+  p2Bags?: number;
 }
 
 export interface GameRow {

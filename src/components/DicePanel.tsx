@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CHURCH_SHAPES, DIE_A_FACES, DIE_B_FACES, combinedCells, shapeName } from '../game/dice';
+import { churchShapesFor, DIE_A_FACES, DIE_B_FACES, combinedCells, shapeName } from '../game/dice';
 import type { BuildingType, Cell, DiceResult } from '../game/types';
 
 const TYPE_NAME: Record<string, string> = {
@@ -78,7 +78,15 @@ function BlueDieFace({ face, side }: { face: { cells: Cell[]; special?: string }
 
 // ---------- Würfel-Panel mit Wurf-Animation ----------
 
-export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey: string }) {
+export default function DicePanel({
+  dice,
+  gameNo,
+  rollKey,
+}: {
+  dice: DiceResult;
+  gameNo: number;
+  rollKey: string;
+}) {
   const [rolling, setRolling] = useState(true);
 
   useEffect(() => {
@@ -102,9 +110,33 @@ export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey
   const cells = combinedCells(dice.a, dice.b);
   const hasZirkel = faceB.special === 'zirkel';
 
-  // Kirchenrunde (Kapitel 2): Zirkel gewürfelt -> alle bauen dieselbe Kirche
+  // Festungsrunde (Kapitel 4): Zirkel gewürfelt -> Festung bauen
+  if (dice.fort) {
+    return (
+      <div className="dice-panel result-pop">
+        <div className="dice-row">
+          <BlueDieFace face={faceB} side="B" />
+          <span className="dice-plus">→</span>
+          <div className="mini-grid" style={{ gridTemplateColumns: 'repeat(1, 20px)' }}>
+            <div className="mini-cell filled built-festung">
+              <span className="fort-mark">▲</span>
+            </div>
+          </div>
+        </div>
+        <div className="dice-label">
+          <b>Festung bauen!</b>
+        </div>
+        <div className="dice-note">
+          Beliebiges freies Feld, keine Angrenzung nötig – Festungen müssen gebaut werden.
+        </div>
+      </div>
+    );
+  }
+
+  // Kirchenrunde (Spiele 4-8): Zirkel gewürfelt -> alle bauen dieselbe Kirche
   if (dice.church != null) {
-    const church = CHURCH_SHAPES[dice.church];
+    const shapes = churchShapesFor(gameNo);
+    const church = shapes[dice.church];
     const maxR = Math.max(...church.map((c) => c[0])) + 1;
     const maxC = Math.max(...church.map((c) => c[1])) + 1;
     const set = new Set(church.map(([r, c]) => r + ',' + c));
@@ -129,7 +161,7 @@ export default function DicePanel({ dice, rollKey }: { dice: DiceResult; rollKey
           </div>
         </div>
         <div className="dice-label">
-          <b>Kirche bauen!</b> ({dice.church + 1}/{CHURCH_SHAPES.length})
+          <b>Kirche bauen!</b> ({dice.church + 1}/{shapes.length})
         </div>
         <div className="dice-note">Zirkel gewürfelt: alle zeichnen diese Kirche ein (◯)</div>
       </div>

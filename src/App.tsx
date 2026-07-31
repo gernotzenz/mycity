@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './lib/supabase';
-import { boardForGame } from './game/board';
-import { rollDice, combinedCells, shapesEqual, CHURCH_SHAPES, DIE_B_FACES } from './game/dice';
-import { scoreGame, validatePlacement } from './game/rules';
+import { boardForGame, isBuildable } from './game/board';
+import {
+  rollDice,
+  combinedCells,
+  shapesEqual,
+  churchShapesFor,
+  FORT_SHAPE,
+  FORT_COUNT,
+  DIE_B_FACES,
+} from './game/dice';
+import {
+  scoreGame,
+  targetCompletionRound,
+  unsurroundedBandits,
+  validatePlacement,
+} from './game/rules';
 import type { Cell, GameRow, HistoryEntry, PlayerState, SharedState } from './game/types';
 import { BUILDING_LABEL, MAX_PASSES, chapterOf } from './game/types';
 import BoardView from './components/BoardView';
@@ -225,9 +238,11 @@ export default function App() {
     if (!row) return;
     const dice = rollDice();
     const { gameNo, churchesUsed } = row.shared;
-    // Kapitel 2: Zirkel gewürfelt -> Kirche bauen (solange Kreise frei sind)
+    const fortsUsed = row.shared.fortsUsed ?? 0;
     const isZirkel = DIE_B_FACES[dice.b].special === 'zirkel';
-    if (gameNo >= 4 && gameNo <= 6 && isZirkel && churchesUsed < CHURCH_SHAPES.length) {
+    const churches = churchShapesFor(gameNo);
+    // Zirkel: Spiele 4-8 -> Kirche bauen; Spiele 11-12 -> Festung bauen.
+    if (isZirkel && churches.length > 0 && churchesUsed < churches.length) {
       persist({
         shared: {
           ...row.shared,
@@ -235,8 +250,16 @@ export default function App() {
           churchesUsed: churchesUsed + 1,
         },
       });
+    } else if (isZirkel && (gameNo === 11 || gameNo === 12) && fortsUsed < FORT_COUNT) {
+      persist({
+        shared: {
+          ...row.shared,
+          dice: { ...dice, church: null, fort: true },
+          fortsUsed: fortsUsed + 1,
+        },
+      });
     } else {
-      persist({ shared: { ...row.shared, dice: { ...dice, church: null } } });
+      persist({ shared: { ...row.shared, dice: { ...dice, church: null, fort: false } } });
     }
   }
 
@@ -250,11 +273,32 @@ export default function App() {
   function restart(gameNo: number) {
     if (!row) return;
     // Ergebnis des beendeten Spiels in die Historie übernehmen (Zwischenstand)
-    const board = boardForGame(row.shared.gameNo);
+    const prevNo = row.shared.gameNo;
+    const players = [row.p1, row.p2];
+    const boards = players.map((p) => (p ? boardForGame(prevNo, p.bandits) : null));
+    const comps = players.map((p, i) =>
+      p ? targetCompletionRound(boards[i]!, p, prevNo) : null
+    );
+    const isFirst = (i: number) =>
+      comps[i] != null && comps.every((o, j) => j === i || o == null || comps[i]! <= o);
+    const scores = players.map((p, i) =>
+      p ? scoreGame(boards[i]!, p, prevNo, isFirst(i)) : null
+    );
     const entry: HistoryEntry = {
-      gameNo: row.shared.gameNo,
-      p1: row.p1 ? scoreGame(board, row.p1, row.shared.gameNo).total : 0,
-      p2: row.p2 ? scoreGame(board, row.p2, row.shared.gameNo).total : 0,
+      gameNo: prevNo,
+      p1: scores[0]?.total ?? 0,
+      p2: scores[1]?.total ?? 0,
+      p1Bags: scores[0]?.bags ?? 0,
+      p2Bags: scores[1]?.bags ?? 0,
+    };
+    // Banditen-Übertrag: Spiel 10 -> 11 und Spiel 11 -> 12
+    const carry = (i: number) => {
+      const p = players[i];
+      if (!p) return undefined;
+      if ((prevNo === 10 && gameNo === 11) || (prevNo === 11 && gameNo === 12)) {
+        return unsurroundedBandits(boards[i]!, p);
+      }
+      return undefined;
     };
     persist({
       shared: {
@@ -264,10 +308,11 @@ export default function App() {
         rollerSeat: 1,
         dice: null,
         churchesUsed: 0,
+        fortsUsed: 0,
         solo: row.shared.solo,
       },
-      p1: row.p1 ? newPlayer(row.p1.name) : null,
-      p2: row.p2 ? newPlayer(row.p2.name) : null,
+      p1: row.p1 ? { ...newPlayer(row.p1.name), bandits: carry(0) } : null,
+      p2: row.p2 ? { ...newPlayer(row.p2.name), bandits: carry(1) } : null,
       history: [...(row.history ?? []), entry],
     });
   }
@@ -320,6 +365,18 @@ export default function App() {
             <button onClick={() => createGame(4, soloMode)}>Spiel 4</button>
             <button onClick={() => createGame(5, soloMode)}>Spiel 5</button>
             <button onClick={() => createGame(6, soloMode)}>Spiel 6</button>
+          </div>
+          <p className="hint">Kapitel 3: Herausforderungen</p>
+          <div className="row-buttons">
+            <button onClick={() => createGame(7, soloMode)}>Spiel 7</button>
+            <button onClick={() => createGame(8, soloMode)}>Spiel 8</button>
+            <button onClick={() => createGame(9, soloMode)}>Spiel 9</button>
+          </div>
+          <p className="hint">Kapitel 4: Banditen</p>
+          <div className="row-buttons">
+            <button onClick={() => createGame(10, soloMode)}>Spiel 10</button>
+            <button onClick={() => createGame(11, soloMode)}>Spiel 11</button>
+            <button onClick={() => createGame(12, soloMode)}>Spiel 12</button>
           </div>
           {soloMode && (
             <p className="hint">Solo: du spielst allein und wirst am Ende über die Erfolgstabelle bewertet.</p>
@@ -387,6 +444,46 @@ const GAME_STORY: Record<number, string> = {
   4: 'Mit immer mehr Siedlern kommt auch die Kirche in eure Gemeinde. Die Kirchenbauer haben genaue Vorstellungen, welche Bauten entstehen sollen.',
   5: 'Die Kirchen gewinnen an Einfluss – alle Siedlergruppen suchen die Nähe zu den Kirchen, um gehört zu werden.',
   6: 'Die Kirchen fordern immer mehr Land. Auch andere Gruppen beanspruchen einen Teil des knappen Baulands.',
+  7: 'Starker Regen lässt den Fluss über die Ufer treten. Sicherheit bieten die Hochebenen am Gebirge und das Sägewerk am Wald.',
+  8: 'Nach der Überschwemmung erschließt ihr die Waldgebiete, um Bauland für den Wiederaufbau zu gewinnen.',
+  9: 'Gold! Am Rand des Siedlungsgebietes wird Gold gefunden – der Run beginnt …',
+  10: 'Der Goldrausch lockt Banditen an. Um die Sicherheit eurer Stadt zu erhalten, müsst ihr sie umzingeln!',
+  11: 'Die Banditen bedrohen eure Stadt. Ihr errichtet über das Land verteilt Festungen, um sie in die Enge zu treiben.',
+  12: 'Noch immer sind Banditen in der Stadt. Dennoch stellt ihr die Weichen für eine erfolgreiche Zukunft.',
+};
+
+const GAME_EXTRA_RULES: Record<number, string[]> = {
+  7: [
+    'Am Sägewerk beginnen: das erste Gebäude grenzt an das Sägewerk.',
+    'Breite Flussfelder: nicht bebaubar; Gebäude gegenüber gelten dort NICHT als angrenzend.',
+    'Hochebenen: Wer zuerst alle 4 überbaut: +5 Punkte. Am Ende alle überbaut: 1 💰. Leer: −1.',
+    'Kapitel 3: Wer im ganzen Spiel nicht passt, erhält 1 💰.',
+  ],
+  8: [
+    'Am Sägewerk beginnen.',
+    'Waldfelder dürfen jetzt überbaut werden! Wer zuerst alle überbaut: +5. Am Ende alle: 1 💰. Leerer Wald: −1.',
+    'Kapitel 3: Wer im ganzen Spiel nicht passt, erhält 1 💰.',
+  ],
+  9: [
+    'Am Sägewerk beginnen. Wald weiterhin bebaubar.',
+    'Goldfelder: Wer zuerst alle 5 überbaut: +5. Am Ende alle: 2 💰. Leer: KEIN Abzug.',
+    'Der Zirkel hat in diesem Spiel keine Bedeutung.',
+    'Kapitel 3: Wer im ganzen Spiel nicht passt, erhält 1 💰.',
+  ],
+  10: [
+    'Banditen können nicht überbaut werden – umzingelt sie (Gebäude an allen 4 Seiten)!',
+    'Jeder nicht umzingelte Bandit: −3 Punkte, und er wandert mit ins nächste Spiel.',
+  ],
+  11: [
+    'Zirkel = Festung: MUSS auf einem beliebigen freien Feld gebaut werden (keine Angrenzung nötig). Von Festungen aus darf weitergebaut werden.',
+    'Vollständige Gruppe einer Gebäudeart (alle Gebäude der Art zusammenhängend): +3.',
+    'Nicht umzingelte Banditen: −3, Übertrag ins nächste Spiel.',
+  ],
+  12: [
+    'An einer beliebigen gedruckten Festung beginnen.',
+    'Bonuswertungen: nie gepasst +6 · alle Bäume erhalten +20 · alle Steine überbaut +6 · kein leeres Feld +12.',
+    'Vollständige Gruppen: je +6. Nicht umzingelte Banditen: je −6.',
+  ],
 };
 
 function RulesModal({ gameNo, onClose }: { gameNo: number; onClose: () => void }) {
@@ -401,12 +498,17 @@ function RulesModal({ gameNo, onClose }: { gameNo: number; onClose: () => void }
         </p>
         <h3>Bauregeln</h3>
         <ul>
+          {(GAME_EXTRA_RULES[gameNo] ?? []).map((rule, i) => (
+            <li key={'x' + i}>
+              <b>{rule}</b>
+            </li>
+          ))}
           {gameNo === 6 ? (
             <li>
               <b>An der Kirche beginnen:</b> Das erste Gebäude muss an die gedruckte Kirche
               angrenzen.
             </li>
-          ) : (
+          ) : gameNo >= 7 && gameNo <= 9 ? null : gameNo === 12 ? null : (
             <li>Das erste Gebäude muss mit einer Seite an den Fluss angrenzen.</li>
           )}
           <li>Jedes weitere Gebäude muss an ein vorhandenes angrenzen (auch über den Fluss hinweg).</li>
@@ -420,7 +522,7 @@ function RulesModal({ gameNo, onClose }: { gameNo: number; onClose: () => void }
           ) : (
             <li>Passen kostet: −1 / −2 / −3 / −5 / −7 / −10 (max. 6-mal).</li>
           )}
-          {gameNo >= 4 && gameNo <= 6 && (
+          {gameNo >= 4 && gameNo <= 8 && (
             <>
               <li>
                 <b>Kirchen:</b> Wird der Zirkel gewürfelt, bauen alle die nächste Kirche aus der
@@ -450,7 +552,7 @@ function RulesModal({ gameNo, onClose }: { gameNo: number; onClose: () => void }
               nichts).
             </li>
           )}
-          {gameNo >= 5 && (
+          {(gameNo === 5 || gameNo === 6) && (
             <li>
               Kirchenpunkte: +3 je Kirche, an die Gebäude aller 3 Gebäudearten angrenzen.
             </li>
@@ -481,9 +583,16 @@ function GameScreen({
 }) {
   const [showRules, setShowRules] = useState(false);
   const shared = row.shared;
-  const board = useMemo(() => boardForGame(shared.gameNo), [shared.gameNo]);
   const me = seat === 1 ? row.p1! : row.p2!;
   const other = seat === 1 ? row.p2 : row.p1;
+  const board = useMemo(
+    () => boardForGame(shared.gameNo, me.bandits),
+    [shared.gameNo, JSON.stringify(me.bandits ?? [])]
+  );
+  const otherBoard = useMemo(
+    () => boardForGame(shared.gameNo, other?.bandits),
+    [shared.gameNo, JSON.stringify(other?.bandits ?? [])]
+  );
   const myTurnToRoll = shared.rollerSeat === seat && !shared.dice && !me.finished;
   const canAct = !!shared.dice && !me.finished && me.doneRound < shared.round;
 
@@ -496,11 +605,13 @@ function GameScreen({
   }, [shared.round, shared.dice?.a, shared.dice?.b]);
 
   const isChurchRound = shared.dice?.church != null;
+  const isFortRound = !!shared.dice?.fort;
   const targetCells = useMemo(() => {
     if (!shared.dice) return [];
-    if (shared.dice.church != null) return CHURCH_SHAPES[shared.dice.church];
+    if (shared.dice.church != null) return churchShapesFor(shared.gameNo)[shared.dice.church];
+    if (shared.dice.fort) return FORT_SHAPE;
     return combinedCells(shared.dice.a, shared.dice.b);
-  }, [shared.dice]);
+  }, [shared.dice, shared.gameNo]);
 
   const occupied = useMemo(() => {
     const s = new Set<string>();
@@ -520,7 +631,7 @@ function GameScreen({
       }
       if (idx >= 0) return prev; // schon markiert
       if (occupied.has(k)) return prev;
-      if (t === '~' || t === 'M' || t === 'F' || t === 'K') return prev; // gesperrte Felder
+      if (!isBuildable(t, board.forestBuildable)) return prev; // gesperrte Felder
       if (prev.length >= targetCells.length) return prev; // schon genug Felder
       return [...prev, [r, c] as Cell];
     });
@@ -530,8 +641,10 @@ function GameScreen({
   const shapeOk = complete && shapesEqual(marked, targetCells);
   const validation = useMemo(
     () =>
-      complete ? validatePlacement(board, me.placements, marked, shared.gameNo === 6) : null,
-    [complete, board, me.placements, marked, shared.gameNo]
+      complete
+        ? validatePlacement(board, me.placements, marked, { freePlacement: isFortRound })
+        : null,
+    [complete, board, me.placements, marked, isFortRound]
   );
   const canConfirm = complete && shapeOk && (validation?.ok ?? false);
 
@@ -553,7 +666,7 @@ function GameScreen({
         ...me.placements,
         {
           cells: marked,
-          type: isChurchRound ? 'kirche' : shared.dice.type,
+          type: isFortRound ? 'festung' : isChurchRound ? 'kirche' : shared.dice.type,
           round: shared.round,
         },
       ],
@@ -562,9 +675,10 @@ function GameScreen({
     setMarked([]);
   }
 
-  // Beim Bau einer Kirche kostet Passen ZWEI Kreise; in Spiel 6 ist Passen verboten.
+  // Beim Bau einer Kirche kostet Passen ZWEI Kreise; in Spiel 6 ist Passen
+  // verboten; Festungen MÜSSEN gebaut werden.
   const passCost = isChurchRound ? 2 : 1;
-  const canPass = shared.gameNo !== 6 && me.passes + passCost <= MAX_PASSES;
+  const canPass = shared.gameNo !== 6 && !isFortRound && me.passes + passCost <= MAX_PASSES;
 
   async function doPass() {
     if (!canPass) return;
@@ -604,6 +718,7 @@ function GameScreen({
         {shared.dice ? (
           <DicePanel
             dice={shared.dice}
+            gameNo={shared.gameNo}
             rollKey={shared.round + '-' + shared.dice.a + '-' + shared.dice.b + '-' + shared.dice.type}
           />
         ) : me.finished ? (
@@ -640,7 +755,7 @@ function GameScreen({
             <button onClick={() => setMarked([])} disabled={marked.length === 0}>
               ↺ Zurücksetzen
             </button>
-            {shared.gameNo !== 6 && (
+            {shared.gameNo !== 6 && !isFortRound && (
               <button onClick={doPass} disabled={!canPass}>
                 Passen ({me.passes}/6{isChurchRound ? ' · ×2' : ''})
               </button>
@@ -662,37 +777,73 @@ function GameScreen({
             {other.name} · Gebäude: {other.placements.length} · Passen: {other.passes}/6{' '}
             {other.finished ? '· fertig' : ''}
           </h3>
-          <BoardView board={board} placements={other.placements} small />
+          <BoardView board={otherBoard} placements={other.placements} small />
         </div>
       )}
     </div>
   );
 }
 
-// Erfolgstabelle für das Solo-Spiel (Kapitel 1 und 2 laut Anleitung)
-function soloRank(points: number): string {
-  const ranks: [number, string][] = [
-    [70, 'Ehrenbürger/in'],
-    [60, 'Bürgermeister/in'],
-    [50, 'Gemeinderat/-rätin'],
-    [42, 'Bauinspektor/in'],
-    [34, 'Meister/in'],
-    [26, 'Geselle/Gesellin'],
-    [18, 'Hilfskraft'],
-    [10, 'Einsiedler/in'],
-  ];
-  for (const [min, title] of ranks) if (points >= min) return title;
+// Erfolgstabelle für das Solo-Spiel (laut Anleitung, je Kapitel andere Grenzen)
+const RANK_TITLES = [
+  'Ehrenbürger/in',
+  'Bürgermeister/in',
+  'Gemeinderat/-rätin',
+  'Bauinspektor/in',
+  'Meister/in',
+  'Geselle/Gesellin',
+  'Hilfskraft',
+  'Einsiedler/in',
+];
+const RANK_MINS: Record<number, number[]> = {
+  1: [70, 60, 50, 42, 34, 26, 18, 10],
+  2: [70, 60, 50, 42, 34, 26, 18, 10],
+  3: [80, 70, 60, 52, 44, 36, 28, 20],
+  4: [120, 105, 90, 80, 70, 60, 50, 40],
+};
+
+function soloRank(points: number, chapter: number): string {
+  const mins = RANK_MINS[chapter] ?? RANK_MINS[1];
+  for (let i = 0; i < mins.length; i++) if (points >= mins[i]) return RANK_TITLES[i];
   return 'Landstreicher/in';
 }
 
 // ---------------- Zwischenstand (Kapitel-Gesamtrechnung) ----------------
 
-function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: number[] }) {
+function Zwischenstand({
+  row,
+  currentTotals,
+  currentBags,
+}: {
+  row: GameRow;
+  currentTotals: number[];
+  currentBags: number[];
+}) {
   const hasP2 = !!row.p2;
   const entries: HistoryEntry[] = [
     ...(row.history ?? []),
-    { gameNo: row.shared.gameNo, p1: currentTotals[0] ?? 0, p2: currentTotals[1] ?? 0 },
+    {
+      gameNo: row.shared.gameNo,
+      p1: currentTotals[0] ?? 0,
+      p2: currentTotals[1] ?? 0,
+      p1Bags: currentBags[0] ?? 0,
+      p2Bags: currentBags[1] ?? 0,
+    },
   ];
+  // Kapitel-3-Bonus: meiste Geldbeutel +20, zweitmeiste +10
+  const ch3 = entries.filter((e) => chapterOf(e.gameNo) === 3);
+  const bags1 = ch3.reduce((a, e) => a + (e.p1Bags ?? 0), 0);
+  const bags2 = ch3.reduce((a, e) => a + (e.p2Bags ?? 0), 0);
+  let bagBonus: [number, number] = [0, 0];
+  if (ch3.length > 0) {
+    if (!hasP2) {
+      bagBonus = [bags1 >= 7 ? 20 : bags1 === 6 ? 10 : 0, 0];
+    } else if (bags1 === bags2) {
+      bagBonus = [20, 20];
+    } else {
+      bagBonus = bags1 > bags2 ? [20, 10] : [10, 20];
+    }
+  }
   const names = [row.p1?.name ?? 'Spieler 1', row.p2?.name ?? 'Spieler 2'];
   const chapters = [...new Set(entries.map((e) => chapterOf(e.gameNo)))].sort();
 
@@ -700,7 +851,7 @@ function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: nu
     list.reduce((a, e) => a + e.p1, 0),
     list.reduce((a, e) => a + e.p2, 0),
   ];
-  const [totalP1, totalP2] = sum(entries);
+  const [totalP1, totalP2] = [sum(entries)[0] + bagBonus[0], sum(entries)[1] + bagBonus[1]];
 
   return (
     <div className="card">
@@ -717,12 +868,15 @@ function Zwischenstand({ row, currentTotals }: { row: GameRow; currentTotals: nu
           {chapters.map((ch) => {
             const inChapter = entries.filter((e) => chapterOf(e.gameNo) === ch);
             const [c1, c2] = sum(inChapter);
+            const bonus: [number, number] = ch === 3 ? bagBonus : [0, 0];
             return (
               <FragmentRows
                 key={ch}
                 chapter={ch}
                 entries={inChapter}
-                chapterSum={[c1, c2]}
+                chapterSum={[c1 + bonus[0], c2 + bonus[1]]}
+                bags={ch === 3 ? [bags1, bags2] : null}
+                bagBonus={ch === 3 ? bonus : null}
                 hasP2={hasP2}
               />
             );
@@ -752,11 +906,15 @@ function FragmentRows({
   chapter,
   entries,
   chapterSum,
+  bags,
+  bagBonus,
   hasP2,
 }: {
   chapter: number;
   entries: HistoryEntry[];
   chapterSum: number[];
+  bags: number[] | null;
+  bagBonus: number[] | null;
   hasP2: boolean;
 }) {
   return (
@@ -768,6 +926,13 @@ function FragmentRows({
           {hasP2 && <td>{e.p2}</td>}
         </tr>
       ))}
+      {bags && bagBonus && (
+        <tr>
+          <td>Geldbeutel-Bonus ({bags[0]}{hasP2 ? ' / ' + bags[1] : ''} 💰)</td>
+          <td>+{bagBonus[0]}</td>
+          {hasP2 && <td>+{bagBonus[1]}</td>}
+        </tr>
+      )}
       <tr className="chapter-row">
         <td>Kapitel {chapter} gesamt</td>
         <td>
@@ -796,24 +961,33 @@ function ScoringScreen({
   onRestart: (gameNo: number) => void;
   onLeave: () => void;
 }) {
-  const board = boardForGame(row.shared.gameNo);
+  const gameNo = row.shared.gameNo;
   const players = [row.p1, row.p2].filter(Boolean) as PlayerState[];
-  const scores = players.map((p) => scoreGame(board, p, row.shared.gameNo));
+  const boards = players.map((p) => boardForGame(gameNo, p.bandits));
+  const comps = players.map((p, i) => targetCompletionRound(boards[i], p, gameNo));
+  const isFirst = (i: number) =>
+    comps[i] != null && comps.every((o, j) => j === i || o == null || comps[i]! <= o);
+  const scores = players.map((p, i) => scoreGame(boards[i], p, gameNo, isFirst(i)));
   const isSolo = players.length === 1;
 
   // Solo: Bewertung über die Erfolgstabelle der Anleitung (Kapitelsumme)
-  const chapterNo = chapterOf(row.shared.gameNo);
-  const chapterTotal =
-    (row.history ?? [])
-      .filter((e) => chapterOf(e.gameNo) === chapterNo)
-      .reduce((a, e) => a + e.p1, 0) + (scores[0]?.total ?? 0);
+  const chapterNo = chapterOf(gameNo);
+  const chapterEntries = (row.history ?? []).filter((e) => chapterOf(e.gameNo) === chapterNo);
+  let chapterTotal = chapterEntries.reduce((a, e) => a + e.p1, 0) + (scores[0]?.total ?? 0);
+  if (isSolo && chapterNo === 3) {
+    const bagsTotal =
+      chapterEntries.reduce((a, e) => a + (e.p1Bags ?? 0), 0) + (scores[0]?.bags ?? 0);
+    chapterTotal += bagsTotal >= 7 ? 20 : bagsTotal === 6 ? 10 : 0;
+  }
   const winner = isSolo
-    ? `Kapitel ${chapterNo}: ${chapterTotal} Punkte – „${soloRank(chapterTotal)}“`
+    ? `Kapitel ${chapterNo}: ${chapterTotal} Punkte – „${soloRank(chapterTotal, chapterNo)}“`
     : scores[0].total === scores[1].total
       ? 'Unentschieden!'
       : scores[0].total > scores[1].total
         ? `${players[0].name} gewinnt!`
         : `${players[1].name} gewinnt!`;
+  const targetLabel =
+    gameNo === 7 ? 'Hochebenen zuerst +5' : gameNo === 8 ? 'Wald zuerst +5' : 'Gold zuerst +5';
 
   return (
     <div className="page">
@@ -880,6 +1054,38 @@ function ScoringScreen({
               ))}
             </tr>
           )}
+          {scores[0]?.targetBonus != null && (
+            <tr>
+              <td>{targetLabel}</td>
+              {scores.map((s, i) => (
+                <td key={i}>+{s.targetBonus ?? 0}</td>
+              ))}
+            </tr>
+          )}
+          {scores[0]?.banditPoints != null && (
+            <tr>
+              <td>Nicht umzingelte Banditen</td>
+              {scores.map((s, i) => (
+                <td key={i}>{s.banditPoints ?? 0}</td>
+              ))}
+            </tr>
+          )}
+          {scores[0]?.fullGroupPoints != null && (
+            <tr>
+              <td>Vollständige Gruppen</td>
+              {scores.map((s, i) => (
+                <td key={i}>+{s.fullGroupPoints ?? 0}</td>
+              ))}
+            </tr>
+          )}
+          {chapterNo === 3 && (
+            <tr>
+              <td>Geldbeutel (dieses Spiel)</td>
+              {scores.map((s, i) => (
+                <td key={i}>{'💰'.repeat(s.bags) || '–'}</td>
+              ))}
+            </tr>
+          )}
           <tr className="total-row">
             <td>Summe</td>
             {scores.map((s, i) => (
@@ -892,14 +1098,18 @@ function ScoringScreen({
       </table>
       <h2 className="center">{winner}</h2>
 
-      <Zwischenstand row={row} currentTotals={scores.map((s) => s.total)} />
+      <Zwischenstand
+        row={row}
+        currentTotals={scores.map((s) => s.total)}
+        currentBags={scores.map((s) => s.bags)}
+      />
 
 
       <div className="boards-final">
-        {players.map((p) => (
+        {players.map((p, i) => (
           <div key={p.name}>
             <h3>{p.name}</h3>
-            <BoardView board={board} placements={p.placements} small />
+            <BoardView board={boards[i]} placements={p.placements} small />
           </div>
         ))}
       </div>
@@ -907,15 +1117,20 @@ function ScoringScreen({
       {seat === 1 && (
         <div className="card">
           <h2>Weiterspielen</h2>
+          {gameNo < 12 && (
+            <button className="primary big" onClick={() => onRestart(gameNo + 1)}>
+              Weiter zu Spiel {gameNo + 1}
+            </button>
+          )}
           <div className="row-buttons">
-            <button className="primary" onClick={() => onRestart(1)}>Spiel 1</button>
-            <button className="primary" onClick={() => onRestart(2)}>Spiel 2</button>
-            <button className="primary" onClick={() => onRestart(3)}>Spiel 3</button>
+            {[1, 2, 3, 4, 5, 6].map((g) => (
+              <button key={g} onClick={() => onRestart(g)}>{g}</button>
+            ))}
           </div>
           <div className="row-buttons">
-            <button className="primary" onClick={() => onRestart(4)}>Spiel 4</button>
-            <button className="primary" onClick={() => onRestart(5)}>Spiel 5</button>
-            <button className="primary" onClick={() => onRestart(6)}>Spiel 6</button>
+            {[7, 8, 9, 10, 11, 12].map((g) => (
+              <button key={g} onClick={() => onRestart(g)}>{g}</button>
+            ))}
           </div>
         </div>
       )}

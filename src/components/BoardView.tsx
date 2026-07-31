@@ -40,7 +40,6 @@ function WellIcon() {
 
 const CELL_BG: Record<CellType, string> = {
   '.': 'cell-normal',
-  '~': 'cell-normal',
   T: 'cell-normal',
   D: 'cell-normal',
   S: 'cell-normal',
@@ -48,7 +47,54 @@ const CELL_BG: Record<CellType, string> = {
   F: 'cell-forest',
   W: 'cell-normal',
   K: 'cell-printed-church',
+  R: 'cell-water',
+  H: 'cell-plateau',
+  G: 'cell-gold',
+  Z: 'cell-printed-church',
+  P: 'cell-printed-church',
+  B: 'cell-normal',
 };
+
+function SawmillIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="svg-icon">
+      <path d="M4 20 V12 L9 8 L14 12 V20 Z" fill="#8d6b45" stroke="#5c4227" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="17" cy="15" r="4" fill="#c9b691" stroke="#5c4227" strokeWidth="1" />
+      <circle cx="17" cy="15" r="1.2" fill="#5c4227" />
+      <path d="M17 10.6 V9 M17 21 V19.4 M12.6 15 H11 M23 15 H21.4" stroke="#5c4227" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function FortIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="svg-icon">
+      <path d="M5 21 V8 H8 V10 H11 V8 H13 V10 H16 V8 H19 V21 Z" fill="#8a4a2b" stroke="#4f2a17" strokeWidth="1.2" strokeLinejoin="round" />
+      <rect x="10.5" y="14" width="3" height="7" fill="#4f2a17" />
+    </svg>
+  );
+}
+
+function BanditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="svg-icon">
+      <circle cx="12" cy="7" r="3" fill="#3b2f24" />
+      <path d="M4 10 H20 L18 8 H6 Z" fill="#3b2f24" />
+      <path d="M7 21 C7 15 17 15 17 21 Z" fill="#3b2f24" />
+      <rect x="9.5" y="6" width="5" height="1.6" fill="#c0392b" />
+    </svg>
+  );
+}
+
+function GoldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="svg-icon">
+      <ellipse cx="9" cy="16" rx="4" ry="3" fill="#e0b93f" stroke="#96741a" strokeWidth="1" />
+      <ellipse cx="15" cy="14" rx="3.4" ry="2.6" fill="#f0d060" stroke="#96741a" strokeWidth="1" />
+      <ellipse cx="12" cy="18" rx="3" ry="2.2" fill="#d4a92f" stroke="#96741a" strokeWidth="1" />
+    </svg>
+  );
+}
 
 function PrintedChurchIcon() {
   return (
@@ -79,47 +125,27 @@ function cellIcon(t: CellType) {
       return <WellIcon />;
     case 'K':
       return <PrintedChurchIcon />;
+    case 'Z':
+      return <SawmillIcon />;
+    case 'P':
+      return <FortIcon />;
+    case 'B':
+      return <BanditIcon />;
+    case 'G':
+      return <GoldIcon />;
     default:
       return null;
   }
 }
 
-// ---------- Fluss als geschwungener SVG-Pfad ----------
-
-function riverChain(board: BoardDef): Cell[] {
-  const cells: Cell[] = [];
-  for (let r = 0; r < board.h; r++)
-    for (let c = 0; c < board.w; c++) if (board.grid[r][c] === '~') cells.push([r, c]);
-  if (cells.length === 0) return [];
-  const set = new Set(cells.map(([r, c]) => r + ',' + c));
-  const start = cells.reduce((a, b) => (b[0] < a[0] ? b : a));
-  const chain: Cell[] = [start];
-  const seen = new Set([start[0] + ',' + start[1]]);
-  while (true) {
-    const [r, c] = chain[chain.length - 1];
-    const next = (
-      [
-        [r + 1, c],
-        [r, c - 1],
-        [r, c + 1],
-        [r - 1, c],
-      ] as Cell[]
-    ).find(([nr, nc]) => set.has(nr + ',' + nc) && !seen.has(nr + ',' + nc));
-    if (!next) break;
-    seen.add(next[0] + ',' + next[1]);
-    chain.push(next);
-  }
-  return chain;
-}
+// ---------- Fluss: geschwungener Pfad AUF den Gitterlinien ----------
 
 function RiverOverlay({ board }: { board: BoardDef }) {
   const d = useMemo(() => {
-    const chain = riverChain(board);
-    if (chain.length === 0) return '';
-    const pts: [number, number][] = chain.map(([r, c]) => [c * 100 + 50, r * 100 + 50]);
-    if (chain[0][0] === 0) pts.unshift([pts[0][0], 0]);
-    const last = chain[chain.length - 1];
-    if (last[0] === board.h - 1) pts.push([pts[pts.length - 1][0], board.h * 100]);
+    const wp = board.riverPath;
+    if (wp.length < 2) return '';
+    // Wegpunkte [y,x] -> Pixel auf den Gitterlinien
+    const pts: [number, number][] = wp.map(([y, x]) => [x * 100, y * 100]);
     let path = `M ${pts[0][0]} ${pts[0][1]}`;
     for (let i = 1; i < pts.length - 1; i++) {
       const mx = (pts[i][0] + pts[i + 1][0]) / 2;
@@ -136,9 +162,9 @@ function RiverOverlay({ board }: { board: BoardDef }) {
       viewBox={`0 0 ${board.w * 100} ${board.h * 100}`}
       preserveAspectRatio="none"
     >
-      <path d={d} fill="none" stroke="#3e88ad" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke="#79c6e3" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke="#b6e4f2" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" />
+      <path d={d} fill="none" stroke="#3e88ad" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="#79c6e3" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="#c9ecf7" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
     </svg>
   );
 }
@@ -211,6 +237,8 @@ export default function BoardView({ board, placements, preview, onDrawCell, smal
             <span className="x-mark">✕</span>
           ) : placement?.type === 'kirche' ? (
             <span className="circle-mark">◯</span>
+          ) : placement?.type === 'festung' ? (
+            <FortIcon />
           ) : placement ? null : (
             cellIcon(t)
           )}

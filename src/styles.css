@@ -255,6 +255,22 @@ button.big {
   background: linear-gradient(140deg, #efe4c2, #e2d3a4);
 }
 
+/* Kapitel 3+4: Spezialfelder */
+.cell-water {
+  background: linear-gradient(140deg, #8fd0e8, #5aa9cc);
+}
+.cell-plateau {
+  background: linear-gradient(140deg, #dfe8b8, #c9d99a);
+}
+.cell-gold {
+  background: linear-gradient(140deg, #f4e3a1, #ecd06e);
+}
+
+.built-festung {
+  background: #e8d9bd;
+}
+.fort-mark { color: #8a4a2b; font-weight: 900; }
+
 .built.b-top { border-top: 2.5px solid #16213e; }
 .built.b-bottom { border-bottom: 2.5px solid #16213e; }
 .built.b-left { border-left: 2.5px solid #16213e; }
