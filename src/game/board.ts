@@ -106,21 +106,20 @@ const SPIEL_1_LAYOUT = [
   'S.......SFF',
   '.....S.FFFF',
 ];
-// Flusslauf (per Rasterkalibrierung vom Foto abgenommen):
-// oben zwischen c4|c5 hinein (x5), Zeilen 2-3 links (x4),
-// Zeilen 4-5 rechts (x5), Zeile 6 links (x4), Austritt unten an der
-// linken oberen Ecke des Steins (7,5) -> x5.
+// Flusslauf vom Nutzer per Karten-Editor vom Original-Blatt abgenommen.
 const RIVER_1: RiverPoint[] = [
   [0, 5],
-  [2, 5],
-  [2, 4],
-  [4, 4],
+  [1, 5],
+  [1, 4],
+  [3, 4],
+  [3, 3],
+  [4, 3],
   [4, 5],
   [6, 5],
   [6, 4],
   [7, 4],
-  [7, 5],
-  [8, 5],
+  [7, 3],
+  [8, 3],
 ];
 
 // Innerhalb eines Kapitels ist die Karte identisch – Spiel 2 nutzt das
@@ -136,35 +135,38 @@ const SPIEL_3_LAYOUT = SPIEL_1_LAYOUT.map((row, r) =>
 // Gemeinsame Karte (nach Foto von Blatt 5); Spiel 5+6 mit 2 Brunnen,
 // Spiel 6 zusätzlich mit gedruckter Kirche am Fluss.
 
+// Layout vom Nutzer per Karten-Editor vom Original-Blatt abgenommen.
+// Auf dem Spiel-4-Blatt ist bereits 1 Brunnen (3,7) aufgedruckt.
 const SPIEL_4_LAYOUT = [
-  '.......D.FF',
-  '..D.......F',
-  'S.....D..SF',
-  'MM....D..FF',
-  'MS.......FF',
-  'SS.D.....FF',
-  '...S....S..',
-  'S....D.....',
+  '..D.......S',
+  'S.......D.F',
+  'M.....D...F',
+  'MM.....W...',
+  'MS........F',
+  '...D.....FF',
+  'S..S....SFF',
+  'S....D.SFFF',
 ];
 const RIVER_4: RiverPoint[] = [
   [0, 4],
   [2, 4],
-  [2, 3],
-  [3, 3],
   [3, 4],
-  [4, 4],
-  [4, 6],
-  [6, 6],
+  [3, 3],
+  [4, 3],
+  [4, 5],
   [6, 5],
-  [8, 5],
+  [6, 3],
+  [7, 3],
+  [7, 0],
 ];
 
-const SPIEL_5_LAYOUT = SPIEL_4_LAYOUT.map((row, r) => {
-  if (r === 1) return row.slice(0, 5) + 'W' + row.slice(6);
-  if (r === 2) return row.slice(0, 8) + 'W' + row.slice(9);
-  return row;
-});
+// Spiel 5+6 haben 2 Brunnen: zweiter Brunnen bei (1,5) – ANNAHME,
+// bitte per Karten-Editor verifizieren.
+const SPIEL_5_LAYOUT = SPIEL_4_LAYOUT.map((row, r) =>
+  r === 1 ? row.slice(0, 5) + 'W' + row.slice(6) : row
+);
 
+// Spiel 6: gedruckte Kirche am Fluss (Position ANNAHME, bitte verifizieren).
 const SPIEL_6_LAYOUT = SPIEL_5_LAYOUT.map((row, r) =>
   r === 3 ? row.slice(0, 4) + 'K' + row.slice(5) : row
 );
@@ -172,17 +174,18 @@ const SPIEL_6_LAYOUT = SPIEL_5_LAYOUT.map((row, r) =>
 // ---- Kapitel 3: Herausforderungen (Spiele 7-9) ----
 
 // Spiel 7: breiter Fluss (R), Hochebenen (H) am Gebirge, Sägewerk (Z).
+// Layout vom Nutzer per Karten-Editor vom Original-Blatt abgenommen.
 const SPIEL_7_LAYOUT = [
-  '....R.D...F',
-  '..S.R..D..F',
-  'HHS.R......',
-  'MM.RR...S.F',
-  'M....D...FF',
-  'HH.D.....FF',
-  '...S.....FF',
-  '.....S.ZZFF',
+  '..SR......D',
+  'H.SR...D..F',
+  'MHSR..D..DF',
+  'MM........S',
+  'M........DF',
+  'H.DRR.D..FF',
+  'SS.SS....FF',
+  '.......ZZFF',
 ];
-const RIVER_7: RiverPoint[] = [[4, 3], [4, 2], [6, 2], [6, 1], [8, 1]];
+const RIVER_7: RiverPoint[] = [[3, 3], [4, 3], [4, 5], [5, 5], [6, 5], [6, 4], [6, 0]];
 
 // Spiel 8: Waldfelder (F) dürfen/sollen überbaut werden.
 // Karte per Rasterkalibrierung vom frontalen Foto abgenommen:
@@ -220,19 +223,32 @@ const RIVER_9 = RIVER_8;
 
 // ---- Kapitel 4: Banditen (Spiele 10-12) ----
 
-// Gemeinsame Kapitel-4-Karte (nach dem frontalen Foto von Blatt 12);
-// je Spiel unterschiedliche Banditen/Festungen.
+// Gemeinsame Kapitel-4-Karte (vom Nutzer per Karten-Editor abgenommen);
+// je Spiel unterschiedliche Banditen/Festungen. 7 Doppelbäume = 14 Bäume.
 const K4_TERRAIN = [
   'S.D.......S',
-  'S......D.D.',
-  'M....D....S',
+  'S.......D.D',
+  'M.....D...S',
   'MM.........',
-  'S.S......DS',
+  'M........DS',
   '..D...D....',
   'S..........',
   '.....S.S.S.',
 ];
-const RIVER_K4: RiverPoint[] = [[0, 4], [2, 4], [2, 3], [4, 3], [4, 4], [6, 4], [6, 3], [8, 3]];
+const RIVER_K4: RiverPoint[] = [
+  [0, 5],
+  [1, 5],
+  [1, 4],
+  [3, 4],
+  [3, 3],
+  [4, 3],
+  [4, 5],
+  [6, 5],
+  [6, 4],
+  [7, 4],
+  [7, 3],
+  [8, 3],
+];
 
 function withMarks(terrain: string[], marks: [number, number, string][]): string[] {
   const grid = terrain.map((r) => r.split(''));
@@ -257,10 +273,10 @@ const SPIEL_11_LAYOUT = withMarks(K4_TERRAIN, [
 
 // Spiel 12: 2 gedruckte Festungen (P) + 2 gedruckte Banditen.
 const SPIEL_12_LAYOUT = withMarks(K4_TERRAIN, [
-  [1, 3, 'P'],
+  [2, 3, 'P'],
   [6, 4, 'P'],
-  [3, 7, 'B'],
-  [4, 2, 'B'],
+  [3, 8, 'B'],
+  [4, 3, 'B'],
 ]);
 const RIVER_12 = RIVER_K4;
 
