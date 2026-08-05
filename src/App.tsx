@@ -725,6 +725,9 @@ function GameScreen({
         <span>
           Kap. {chapterOf(shared.gameNo)} · Spiel {shared.gameNo}
         </span>
+        <span className="code-badge" title="Spiel-Code zum Wiedereinstieg">
+          ⌗ {row.code}
+        </span>
         <span>Runde {shared.round}</span>
         <span>Passen: {me.passes}/6</span>
         <button className="icon-btn" onClick={onLeave} aria-label="Verlassen">
@@ -732,6 +735,17 @@ function GameScreen({
         </button>
       </header>
       {showRules && <RulesModal gameNo={shared.gameNo} onClose={() => setShowRules(false)} />}
+
+      <BoardView
+        board={board}
+        placements={me.placements}
+        preview={
+          marked.length > 0 && canAct
+            ? { cells: marked, state: !complete ? 'partial' : canConfirm ? 'ok' : 'bad' }
+            : null
+        }
+        onDrawCell={canAct ? drawCell : undefined}
+      />
 
       <div className="dice-area">
         {shared.dice ? (
@@ -750,17 +764,6 @@ function GameScreen({
           <p className="hint">{other?.name ?? 'Mitspieler'} würfelt …</p>
         )}
       </div>
-
-      <BoardView
-        board={board}
-        placements={me.placements}
-        preview={
-          marked.length > 0 && canAct
-            ? { cells: marked, state: !complete ? 'partial' : canConfirm ? 'ok' : 'bad' }
-            : null
-        }
-        onDrawCell={canAct ? drawCell : undefined}
-      />
 
       {canAct && (
         <div className="controls">
@@ -1011,6 +1014,9 @@ function ScoringScreen({
   return (
     <div className="page">
       <h1>Wertung – Spiel {row.shared.gameNo}</h1>
+      <p className="center hint" style={{ marginTop: -6 }}>
+        Spiel-Code: <b>{row.code}</b>
+      </p>
       <table className="score-table">
         <thead>
           <tr>
