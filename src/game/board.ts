@@ -207,34 +207,23 @@ const SPIEL_8_LAYOUT = [
 // unter Zeile 5 nach links aus dem Blatt hinaus.
 const RIVER_8: RiverPoint[] = [[0, 4], [3, 4], [3, 3], [4, 3], [4, 5], [6, 5], [6, 0]];
 
-// Spiel 9: gleiche Karte wie Spiel 8, aber 5 Felder zeigen Gold (G) –
-// vor allem die grünen Felder am Gebirge; Zirkel ohne Bedeutung.
-const SPIEL_9_LAYOUT = SPIEL_8_LAYOUT.map((row, r) => {
-  const set = (s: string, c: number) => s.slice(0, c) + 'G' + s.slice(c + 1);
-  let out = row;
-  if (r === 0) out = set(out, 3);
-  if (r === 1) out = set(out, 0);
-  if (r === 2) out = set(out, 1);
-  if (r === 4) out = set(out, 1);
-  if (r === 7) out = set(out, 0);
-  return out;
-});
-const RIVER_9 = RIVER_8;
+// Spiel 9: Layout vom Nutzer per Karten-Editor abgenommen.
+const SPIEL_9_LAYOUT = [
+  'S..G.DG...S',
+  'G.......D.F',
+  'M..S..D...F',
+  'MM........S',
+  'MG.......DD',
+  '..DSS.D..FF',
+  'S........FF',
+  'G......ZZFF',
+];
+const RIVER_9: RiverPoint[] = [[0, 4], [3, 4], [3, 3], [4, 3], [4, 5], [6, 5], [6, 0]];
 
 // ---- Kapitel 4: Banditen (Spiele 10-12) ----
 
-// Gemeinsame Kapitel-4-Karte (vom Nutzer per Karten-Editor abgenommen);
-// je Spiel unterschiedliche Banditen/Festungen. 7 Doppelbäume = 14 Bäume.
-const K4_TERRAIN = [
-  'S.D.......S',
-  'S.......D.D',
-  'M.....D...S',
-  'MM.........',
-  'M........DS',
-  '..D...D....',
-  'S..........',
-  '.....S.S.S.',
-];
+// Kapitel-4-Karten – vom Nutzer per Karten-Editor abgenommen.
+// Gleicher Flusslauf wie Kapitel 1.
 const RIVER_K4: RiverPoint[] = [
   [0, 5],
   [1, 5],
@@ -250,34 +239,42 @@ const RIVER_K4: RiverPoint[] = [
   [8, 3],
 ];
 
-function withMarks(terrain: string[], marks: [number, number, string][]): string[] {
-  const grid = terrain.map((r) => r.split(''));
-  for (const [r, c, ch] of marks) grid[r][c] = ch;
-  return grid.map((r) => r.join(''));
-}
+// Spiel 10: 6 Banditen, dazu 5 Goldfelder (dekorativ vom Goldrausch;
+// leer kein Abzug, überbaubar).
+const SPIEL_10_LAYOUT = [
+  'G.D..B....G',
+  'S.......D.D',
+  'M.....DG..S',
+  'MM.........',
+  'MS......BDG',
+  'G.D...D...B',
+  'S........B.',
+  '..B..SBS...',
+];
 
-const SPIEL_10_LAYOUT = withMarks(K4_TERRAIN, [
-  [1, 6, 'B'],
-  [3, 3, 'B'],
-  [4, 8, 'B'],
-  [6, 4, 'B'],
-]);
+// Spiel 11: 5 Banditen + 2 gedruckte Festungen.
+const SPIEL_11_LAYOUT = [
+  'S.D....B..S',
+  'S...B...D.D',
+  'M..P..D...S',
+  'MM.........',
+  'MS.......DS',
+  'S.D...D.B..',
+  'S.B.P..B...',
+  '.....S.S.S.',
+];
 
-const SPIEL_11_LAYOUT = withMarks(K4_TERRAIN, [
-  [0, 6, 'B'],
-  [1, 3, 'B'],
-  [3, 5, 'B'],
-  [5, 8, 'B'],
-  [6, 2, 'B'],
-]);
-
-// Spiel 12: 2 gedruckte Festungen (P) + 2 gedruckte Banditen.
-const SPIEL_12_LAYOUT = withMarks(K4_TERRAIN, [
-  [2, 3, 'P'],
-  [6, 4, 'P'],
-  [3, 8, 'B'],
-  [4, 3, 'B'],
-]);
+// Spiel 12: 2 gedruckte Festungen + 2 gedruckte Banditen.
+const SPIEL_12_LAYOUT = [
+  'S.D.......S',
+  'S.......D.D',
+  'M..P..D...S',
+  'MM......B..',
+  'M..B.....DS',
+  '..D...D....',
+  'S...P......',
+  '.....S.S.S.',
+];
 const RIVER_12 = RIVER_K4;
 
 const BOARDS: Record<number, BoardDef> = {

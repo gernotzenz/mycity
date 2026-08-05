@@ -118,7 +118,13 @@ function cellIcon(t: CellType) {
         </span>
       );
     case 'S':
-      return <img src={stoneUrl} alt="" className="img-icon img-stone" draggable={false} />;
+      // Jedes Steinfeld zeigt zwei Steine (-2 Punkte)
+      return (
+        <span className="double-tree">
+          <img src={stoneUrl} alt="" className="img-icon img-stone" draggable={false} />
+          <img src={stoneUrl} alt="" className="img-icon img-stone" draggable={false} />
+        </span>
+      );
     case 'M':
       return <MountainIcon />;
     case 'W':

@@ -178,6 +178,8 @@ export function scoreGame(
       // Goldfelder (G) und Brunnen (W) bringen leer keinen Abzug.
     }
   }
+  // Je nicht überbautem Steinfeld -1 Punkt (das Feld zeigt zwar zwei
+  // Steine, zählt aber als EIN Stein).
   stonePoints = -uncoveredStones;
   emptyPoints = -emptyCount;
 

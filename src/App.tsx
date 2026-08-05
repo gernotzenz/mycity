@@ -91,6 +91,15 @@ export default function App() {
     setRow(null);
   }
 
+  // Nur updaten, wenn sich wirklich etwas geändert hat – verhindert
+  // unnötige Re-Renders (Speicher/Akku auf dem Handy).
+  const applyRow = useCallback((next: GameRow) => {
+    setRow((prev) => {
+      if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
+      return next;
+    });
+  }, []);
+
   // ---- Sync: Realtime + Polling-Fallback ----
   useEffect(() => {
     if (!supabase || !row) return;
@@ -100,18 +109,19 @@ export default function App() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'games', filter: `code=eq.${code}` },
-        (payload) => setRow(payload.new as GameRow)
+        (payload) => applyRow(payload.new as GameRow)
       )
       .subscribe();
     const poll = setInterval(async () => {
+      if (document.hidden) return; // im Hintergrund nicht pollen
       const { data } = await supabase!.from('games').select('*').eq('code', code).single();
-      if (data) setRow(data as GameRow);
-    }, 4000);
+      if (data) applyRow(data as GameRow);
+    }, 5000);
     return () => {
       supabase!.removeChannel(channel);
       clearInterval(poll);
     };
-  }, [row?.code]);
+  }, [row?.code, applyRow]);
 
   const persist = useCallback(
     async (patch: Partial<GameRow>) => {
@@ -546,8 +556,8 @@ function RulesModal({ gameNo, onClose }: { gameNo: number; onClose: () => void }
         </ul>
         <h3>Wertung</h3>
         <ul>
-          <li>Jeder freie Baum: +1</li>
-          <li>Jeder nicht überbaute Stein: −1</li>
+          <li>Jeder freie Baum: +1 (Doppelbaum-Feld: +2)</li>
+          <li>Jedes nicht überbaute Steinfeld: −1</li>
           <li>Jedes leere Feld: −1</li>
           {gameNo >= 2 && (
             <li>
@@ -1026,7 +1036,7 @@ function ScoringScreen({
           <tr>
             <td>Stein −1</td>
             {scores.map((s, i) => (
-              <td key={i}>{s.stonePoints}</td>
+              <td key={i}>{s.stonePoints > 0 ? '+' + s.stonePoints : s.stonePoints}</td>
             ))}
           </tr>
           <tr>

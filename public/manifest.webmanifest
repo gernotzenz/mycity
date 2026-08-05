@@ -1,0 +1,9 @@
+{
+  "name": "My City – Würfelspiel",
+  "short_name": "My City",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#4d90c4",
+  "theme_color": "#2f6fa8"
+}
